@@ -1,10 +1,10 @@
-package com.mobiledevpro.apptemplate.ui.mainscreen.view;
+package com.mobiledevpro.camera.ui.mainscreen.view;
 
 import android.support.v7.widget.Toolbar;
 import android.view.View;
 
-import com.mobiledevpro.apptemplate.R;
-import com.mobiledevpro.apptemplate.helper.FragmentsHelper;
+import com.mobiledevpro.camera.R;
+import com.mobiledevpro.camera.helper.FragmentsHelper;
 import com.mobiledevpro.commons.activity.BaseActivity;
 
 public class MainActivity extends BaseActivity {

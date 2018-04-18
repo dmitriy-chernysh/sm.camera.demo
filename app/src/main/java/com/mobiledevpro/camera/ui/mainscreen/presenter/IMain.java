@@ -1,4 +1,4 @@
-package com.mobiledevpro.apptemplate.ui.mainscreen.presenter;
+package com.mobiledevpro.camera.ui.mainscreen.presenter;
 
 import android.app.Activity;
 

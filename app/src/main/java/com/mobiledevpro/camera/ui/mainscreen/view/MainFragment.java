@@ -1,12 +1,12 @@
-package com.mobiledevpro.apptemplate.ui.mainscreen.view;
+package com.mobiledevpro.camera.ui.mainscreen.view;
 
 import android.os.Bundle;
 import android.support.annotation.Nullable;
 import android.view.View;
 
-import com.mobiledevpro.apptemplate.R;
-import com.mobiledevpro.apptemplate.ui.mainscreen.presenter.IMain;
-import com.mobiledevpro.apptemplate.ui.mainscreen.presenter.MainPresenter;
+import com.mobiledevpro.camera.R;
+import com.mobiledevpro.camera.ui.mainscreen.presenter.IMain;
+import com.mobiledevpro.camera.ui.mainscreen.presenter.MainPresenter;
 import com.mobiledevpro.commons.fragment.BaseFragment;
 
 /**

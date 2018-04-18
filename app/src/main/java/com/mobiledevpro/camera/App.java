@@ -1,4 +1,4 @@
-package com.mobiledevpro.apptemplate;
+package com.mobiledevpro.camera;
 
 import android.app.Application;
 import android.content.Context;

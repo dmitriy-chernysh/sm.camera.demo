@@ -19,7 +19,7 @@ android {
     compileSdkVersion rootProject.compileSdkVersion
 
     defaultConfig {
-        applicationId "com.mobiledevpro.apptemplate"
+        applicationId "com.mobiledevpro.sm.camera.demo"
         minSdkVersion rootProject.minSdkVersion
         targetSdkVersion rootProject.targetSdkVersion
         vectorDrawables.useSupportLibrary = true
@@ -84,7 +84,7 @@ android {
                         "v" + variant.productFlavors[0].versionName + "_" +
                         "build" + variant.productFlavors[0].versionCode + "-" +
                         variant.buildType.name +
-                        ".apk";
+                        ".apk"
             }
         }
     }
@@ -104,6 +104,4 @@ dependencies {
 
     //commons-ui
     implementation 'com.github.mobile-dev-pro:commons-ui:1.0.5'
-
-    implementation project(":data")
 }
