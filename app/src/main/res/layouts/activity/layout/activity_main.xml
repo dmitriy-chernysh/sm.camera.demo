@@ -7,8 +7,6 @@
     android:background="@color/colorWindowGreyBackground"
     android:fitsSystemWindows="true">
 
-    <include layout="@layout/include_base_appbar"/>
-
     <include layout="@layout/include_base_fragment_container"/>
 
 </android.support.design.widget.CoordinatorLayout>

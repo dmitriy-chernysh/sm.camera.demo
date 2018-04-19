@@ -1,6 +1,5 @@
 package com.mobiledevpro.camera.ui.mainscreen.view;
 
-import android.support.v7.widget.Toolbar;
 import android.view.View;
 
 import com.mobiledevpro.camera.R;
@@ -16,10 +15,7 @@ public class MainActivity extends BaseActivity {
 
     @Override
     protected void initToolbar() {
-        Toolbar toolbar = (Toolbar) findViewById(R.id.toolbar);
-        if (toolbar != null) {
-            setSupportActionBar(toolbar);
-        }
+        //no need
     }
 
     @Override

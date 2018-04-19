@@ -6,7 +6,7 @@ import android.support.v4.app.FragmentManager;
 import android.support.v4.app.FragmentTransaction;
 
 import com.mobiledevpro.camera.R;
-import com.mobiledevpro.camera.ui.mainscreen.view.MainFragment;
+import com.mobiledevpro.camera.ui.mainscreen.view.SMCameraFragment;
 
 /**
  * Helper class for work with fragments
@@ -37,7 +37,7 @@ public class FragmentsHelper {
         ft.setAllowOptimization(false);
         ft.replace(
                 containerResId,
-                MainFragment.newInstance(),
+                SMCameraFragment.newInstance(),
                 TAG_FRAGMENT_MAIN
         ).commit();
     }
@@ -70,7 +70,7 @@ public class FragmentsHelper {
 
         ft.replace(
                 containerResId,
-                MainFragment.newInstance(),
+                SMCameraFragment.newInstance(),
                 TAG_FRAGMENT_MAIN
         ).commit();
     }
