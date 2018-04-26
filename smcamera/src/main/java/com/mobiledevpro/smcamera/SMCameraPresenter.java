@@ -29,12 +29,19 @@ public class SMCameraPresenter implements ISMCamera.Presenter {
 
     private Camera mCamera;
     private SurfaceTexture mSurfaceTexture;
+    private AutoFitTextureView mCameraPreview;
+
+    private boolean mIsVideoRecording;
 
     @Override
     public void bindView(ISMCamera.View view) {
         mView = view;
         //check permissions to use camera and microphone
         checkRuntimePermissions();
+
+        mCameraPreview = mView.getCameraPreview();
+        //ratio by default
+        mCameraPreview.setAspectRatio(16, 9);
     }
 
     @Override
@@ -59,6 +66,12 @@ public class SMCameraPresenter implements ISMCamera.Presenter {
                 }
                 break;
         }
+    }
+
+    @Override
+    public void onVideoRecordButtonClick() {
+        mIsVideoRecording = !mIsVideoRecording;
+        mView.setRecordingState(mIsVideoRecording);
     }
 
     private void startCameraPreview() {

@@ -18,6 +18,10 @@ import android.support.annotation.NonNull;
 public interface ISMCamera {
     interface View {
         Activity getActivity();
+
+        AutoFitTextureView getCameraPreview();
+
+        void setRecordingState(boolean isRecording);
     }
 
     interface Presenter {
@@ -29,5 +33,7 @@ public interface ISMCamera {
         void onCameraViewAvailable(SurfaceTexture surfaceTexture);
 
         void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults);
+
+        void onVideoRecordButtonClick();
     }
 }

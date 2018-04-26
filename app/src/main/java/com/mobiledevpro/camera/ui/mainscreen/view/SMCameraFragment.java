@@ -7,15 +7,18 @@ import android.support.annotation.Nullable;
 import android.util.Log;
 import android.view.TextureView;
 import android.view.View;
+import android.widget.ImageButton;
 
 import com.mobiledevpro.camera.R;
 import com.mobiledevpro.camera.helper.Constants;
 import com.mobiledevpro.commons.fragment.BaseFragment;
+import com.mobiledevpro.smcamera.AutoFitTextureView;
 import com.mobiledevpro.smcamera.ISMCamera;
 import com.mobiledevpro.smcamera.SMCameraPresenter;
 
 import butterknife.BindView;
 import butterknife.ButterKnife;
+import butterknife.OnClick;
 import butterknife.Unbinder;
 
 /**
@@ -32,7 +35,10 @@ import butterknife.Unbinder;
 public class SMCameraFragment extends BaseFragment implements ISMCamera.View, TextureView.SurfaceTextureListener {
 
     @BindView(R.id.camera_view)
-    TextureView mCameraPreview;
+    AutoFitTextureView mCameraPreview;
+
+    @BindView(R.id.btn_record_start_stop)
+    ImageButton mBtnVideoRecord;
 
     private ISMCamera.Presenter mPresenter;
     private Unbinder mButterKnife;
@@ -105,7 +111,7 @@ public class SMCameraFragment extends BaseFragment implements ISMCamera.View, Te
     @Override
     public void onSurfaceTextureSizeChanged(SurfaceTexture surfaceTexture, int i, int i1) {
         Log.d(Constants.LOG_TAG_DEBUG, "SMCameraFragment.onSurfaceTextureSizeChanged(): ");
-          //do nothing
+        //do nothing
     }
 
     @Override
@@ -118,5 +124,20 @@ public class SMCameraFragment extends BaseFragment implements ISMCamera.View, Te
     public void onSurfaceTextureAvailable(SurfaceTexture surfaceTexture, int i, int i1) {
         Log.d(Constants.LOG_TAG_DEBUG, "SMCameraFragment.onSurfaceTextureAvailable(): ");
         mPresenter.onCameraViewAvailable(surfaceTexture);
+    }
+
+    @Override
+    public AutoFitTextureView getCameraPreview() {
+        return mCameraPreview;
+    }
+
+    @Override
+    public void setRecordingState(boolean isRecording) {
+        mBtnVideoRecord.setActivated(isRecording);
+    }
+
+    @OnClick(R.id.btn_record_start_stop)
+    void onVideoRecordButtonClick(ImageButton button) {
+        mPresenter.onVideoRecordButtonClick();
     }
 }
