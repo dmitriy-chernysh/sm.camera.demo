@@ -40,6 +40,9 @@ public class SMCameraFragment extends BaseFragment implements ISMCamera.View, Te
     @BindView(R.id.btn_record_start_stop)
     ImageButton mBtnVideoRecord;
 
+    @BindView(R.id.btn_aspect)
+    ImageButton mBtnAspectRation;
+
     private ISMCamera.Presenter mPresenter;
     private Unbinder mButterKnife;
 
@@ -136,8 +139,18 @@ public class SMCameraFragment extends BaseFragment implements ISMCamera.View, Te
         mBtnVideoRecord.setActivated(isRecording);
     }
 
+    @Override
+    public void setFullAspectRatio(boolean b) {
+        mBtnAspectRation.setActivated(b);
+    }
+
     @OnClick(R.id.btn_record_start_stop)
     void onVideoRecordButtonClick(ImageButton button) {
         mPresenter.onVideoRecordButtonClick();
+    }
+
+    @OnClick(R.id.btn_aspect)
+    void onChangeAspectRatio(ImageButton button) {
+        mPresenter.onAspectRatioButtonClick();
     }
 }

@@ -32,6 +32,7 @@ public class SMCameraPresenter implements ISMCamera.Presenter {
     private AutoFitTextureView mCameraPreview;
 
     private boolean mIsVideoRecording;
+    private boolean mIsAspectRationFull = true;
 
     @Override
     public void bindView(ISMCamera.View view) {
@@ -42,6 +43,8 @@ public class SMCameraPresenter implements ISMCamera.Presenter {
         mCameraPreview = mView.getCameraPreview();
         //ratio by default
         mCameraPreview.setAspectRatio(16, 9);
+        mView.setFullAspectRatio(mIsAspectRationFull);
+
     }
 
     @Override
@@ -72,6 +75,13 @@ public class SMCameraPresenter implements ISMCamera.Presenter {
     public void onVideoRecordButtonClick() {
         mIsVideoRecording = !mIsVideoRecording;
         mView.setRecordingState(mIsVideoRecording);
+    }
+
+    @Override
+    public void onAspectRatioButtonClick() {
+        mIsAspectRationFull = !mIsAspectRationFull;
+        mCameraPreview.setAspectRatio(mIsAspectRationFull ? 16 : 4, mIsAspectRationFull ? 9 : 3);
+        mView.setFullAspectRatio(mIsAspectRationFull);
     }
 
     private void startCameraPreview() {

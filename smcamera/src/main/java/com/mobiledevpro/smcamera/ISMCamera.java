@@ -22,6 +22,8 @@ public interface ISMCamera {
         AutoFitTextureView getCameraPreview();
 
         void setRecordingState(boolean isRecording);
+
+        void setFullAspectRatio(boolean b);
     }
 
     interface Presenter {
@@ -35,5 +37,7 @@ public interface ISMCamera {
         void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults);
 
         void onVideoRecordButtonClick();
+
+        void onAspectRatioButtonClick();
     }
 }
