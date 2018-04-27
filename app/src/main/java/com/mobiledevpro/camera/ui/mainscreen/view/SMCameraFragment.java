@@ -1,5 +1,6 @@
 package com.mobiledevpro.camera.ui.mainscreen.view;
 
+import android.app.Activity;
 import android.graphics.SurfaceTexture;
 import android.os.Bundle;
 import android.support.annotation.NonNull;
@@ -7,6 +8,7 @@ import android.support.annotation.Nullable;
 import android.util.Log;
 import android.view.TextureView;
 import android.view.View;
+import android.view.WindowManager;
 import android.widget.ImageButton;
 
 import com.mobiledevpro.camera.R;
@@ -59,6 +61,12 @@ public class SMCameraFragment extends BaseFragment implements ISMCamera.View, Te
     public void onCreate(@Nullable Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setRetainInstance(false);
+
+        Activity activity = getActivity();
+        if (activity != null) {
+            //keep screen on
+            activity.getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+        }
     }
 
     @Override
