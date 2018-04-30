@@ -4,6 +4,8 @@ import android.app.Activity;
 import android.graphics.SurfaceTexture;
 import android.support.annotation.NonNull;
 
+import java.io.File;
+
 /**
  * Interface for main screen
  * <p>
@@ -36,7 +38,7 @@ public interface ISMCamera {
 
         void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults);
 
-        void onVideoRecordButtonClick();
+        void onVideoRecordButtonClick(File newVideoFile);
 
         void onAspectRatioButtonClick();
     }

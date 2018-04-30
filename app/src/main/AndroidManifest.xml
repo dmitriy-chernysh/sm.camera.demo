@@ -3,8 +3,6 @@
           package="com.mobiledevpro.camera">
 
     <uses-permission android:name="android.permission.INTERNET"/>
-    <uses-permission android:name="android.permission.CAMERA" />
-    <uses-permission android:name="android.permission.RECORD_AUDIO" />
 
     <!-- need camera -->
     <uses-feature

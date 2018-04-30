@@ -11,8 +11,10 @@ import android.view.View;
 import android.view.WindowManager;
 import android.widget.ImageButton;
 
+import com.mobiledevpro.camera.App;
 import com.mobiledevpro.camera.R;
 import com.mobiledevpro.camera.helper.Constants;
+import com.mobiledevpro.camera.helper.StorageHelper;
 import com.mobiledevpro.commons.fragment.BaseFragment;
 import com.mobiledevpro.smcamera.AutoFitTextureView;
 import com.mobiledevpro.smcamera.ISMCamera;
@@ -154,7 +156,9 @@ public class SMCameraFragment extends BaseFragment implements ISMCamera.View, Te
 
     @OnClick(R.id.btn_record_start_stop)
     void onVideoRecordButtonClick(ImageButton button) {
-        mPresenter.onVideoRecordButtonClick();
+        mPresenter.onVideoRecordButtonClick(
+                StorageHelper.get(App.getAppContext()).createNewVideoFile()
+        );
     }
 
     @OnClick(R.id.btn_aspect)

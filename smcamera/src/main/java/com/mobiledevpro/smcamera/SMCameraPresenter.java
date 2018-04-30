@@ -1,14 +1,17 @@
 package com.mobiledevpro.smcamera;
 
+import android.content.DialogInterface;
 import android.content.pm.PackageManager;
 import android.graphics.SurfaceTexture;
 import android.hardware.Camera;
 import android.support.annotation.NonNull;
 import android.support.v4.app.Fragment;
+import android.support.v7.app.AlertDialog;
 import android.util.Log;
 
 import com.mobiledevpro.commons.helpers.BasePermissionsHelper;
 
+import java.io.File;
 import java.io.IOException;
 
 /**
@@ -33,6 +36,8 @@ public class SMCameraPresenter implements ISMCamera.Presenter {
 
     private boolean mIsVideoRecording;
     private boolean mIsAspectRationFull = true;
+    private CameraHelper mCameraHelper;
+
 
     @Override
     public void bindView(ISMCamera.View view) {
@@ -44,6 +49,24 @@ public class SMCameraPresenter implements ISMCamera.Presenter {
         //ratio by default
         mCameraPreview.setAspectRatio(16, 9);
         mView.setFullAspectRatio(mIsAspectRationFull);
+
+        mCameraHelper = CameraHelper.get(mView.getActivity());
+
+        //check if it's a Samsung device
+        if (!mCameraHelper.isThisSamsungDevice()) {
+            new AlertDialog.Builder(mView.getActivity(), R.style.CommonAppTheme_AlertDialog)
+                    .setTitle(R.string.dialog_title_error)
+                    .setMessage("This is not a Samsung camera")
+                    .setPositiveButton(R.string.button_ok, new DialogInterface.OnClickListener() {
+                        @Override
+                        public void onClick(DialogInterface dialogInterface, int i) {
+                            mView.getActivity().finish();
+                        }
+                    })
+                    .create()
+                    .show();
+
+        }
 
     }
 
@@ -72,9 +95,12 @@ public class SMCameraPresenter implements ISMCamera.Presenter {
     }
 
     @Override
-    public void onVideoRecordButtonClick() {
+    public void onVideoRecordButtonClick(File newVideoFile) {
         mIsVideoRecording = !mIsVideoRecording;
         mView.setRecordingState(mIsVideoRecording);
+
+        Log.d(Constants.LOG_TAG_DEBUG, "SMCameraPresenter.onVideoRecordButtonClick(): newVideoFile: " + newVideoFile);
+        //start or stop record video
     }
 
     @Override

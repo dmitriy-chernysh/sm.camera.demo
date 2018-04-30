@@ -2,4 +2,8 @@
     <string name="app_name">smcamera</string>
 
     <string name="message_camera_loading">Camera loading&#8230;</string>
+
+    <string name="dialog_title_error">Error</string>
+
+    <string name="button_ok">Ok</string>
 </resources>
