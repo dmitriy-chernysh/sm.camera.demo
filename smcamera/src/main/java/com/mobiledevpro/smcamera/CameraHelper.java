@@ -1,12 +1,37 @@
 package com.mobiledevpro.smcamera;
 
+import android.annotation.TargetApi;
 import android.app.Activity;
 import android.app.AlertDialog;
 import android.content.Context;
 import android.content.DialogInterface;
+import android.graphics.SurfaceTexture;
+import android.hardware.camera2.CameraAccessException;
+import android.media.MediaRecorder;
+import android.os.Handler;
+import android.os.HandlerThread;
+import android.util.Log;
+import android.util.Range;
+import android.util.Size;
+import android.view.Surface;
+import android.view.TextureView;
 
 import com.samsung.android.sdk.SsdkUnsupportedException;
 import com.samsung.android.sdk.camera.SCamera;
+import com.samsung.android.sdk.camera.SCameraCaptureSession;
+import com.samsung.android.sdk.camera.SCameraCharacteristics;
+import com.samsung.android.sdk.camera.SCameraDevice;
+import com.samsung.android.sdk.camera.SCameraManager;
+import com.samsung.android.sdk.camera.SCaptureRequest;
+import com.samsung.android.sdk.camera.STotalCaptureResult;
+
+import java.io.File;
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
+import java.util.concurrent.Semaphore;
+import java.util.concurrent.TimeUnit;
 
 /**
  * Camera helper
@@ -17,20 +42,71 @@ import com.samsung.android.sdk.camera.SCamera;
  * https://github.com/dmitriy-chernysh
  * #MobileDevPro
  */
-public class CameraHelper {
+@TargetApi(21)
+class CameraHelper implements ICameraHelper {
+
+    private static final int CAMERA_STATE_IDLE = 0;
+    private static final int CAMERA_STATE_START_PREVIEW = 1;
+    private static final int CAMERA_STATE_PREVIEW = 2;
+    private static final int CAMERA_STATE_RECORD_VIDEO = 3;
+    private static final int CAMERA_STATE_CLOSING = 4;
 
     private static CameraHelper sHelper;
+
+    //A {@link Semaphore} to prevent the app from exiting before closing the camera.
+    private Semaphore mCameraOpenCloseLock = new Semaphore(1);
+
     private SCamera mSCamera;
+    private SCameraManager mSCameraManager;
+    private SCameraDevice mSCameraDevice;
+    private SCameraCaptureSession mSCameraSession;
+    private SCameraCharacteristics mCharacteristics;
+    private SCaptureRequest.Builder mPreviewBuilder;
+    private List<SCaptureRequest> mRepeatingList;
+
+    private String mCameraId;
+    private int mCameraState = CAMERA_STATE_IDLE;
+
+    private int mLastOrientation = 90;
+    private Size mPreviewSize;
+    private List<VideoParameter> mVideoParameterList = new ArrayList<>();
+    private VideoParameter mVideoParameter;
+    private TextureView mTextureView;
+
+    private HandlerThread mBackgroundHandlerThread;
+    private Handler mBackgroundHandler;
+
+    private MediaRecorder mMediaRecorder;
+    private File mFilesDir;
+
+    private SCameraCaptureSession.CaptureCallback mSessionCaptureCallback = new SCameraCaptureSession.CaptureCallback() {
+        @Override
+        public void onCaptureCompleted(SCameraCaptureSession session,
+                                       SCaptureRequest request,
+                                       STotalCaptureResult result) {
+            // Depends on the current state and capture result, app will take next action.
+            switch (getCameraState()) {
+
+                case CAMERA_STATE_IDLE:
+                case CAMERA_STATE_PREVIEW:
+                case CAMERA_STATE_CLOSING:
+                    // do nothing
+                    break;
+            }
+        }
+    };
 
     private CameraHelper(Context context) {
+        mFilesDir = context.getExternalFilesDir(null);
         initSCamera(context);
     }
 
-    public static CameraHelper get(Context context) {
+    public static CameraHelper init(Context context) {
         if (sHelper == null) sHelper = new CameraHelper(context);
         return sHelper;
     }
 
+    @Override
     public boolean isThisSamsungDevice() {
         if (mSCamera.isFeatureEnabled(SCamera.SCAMERA_PROCESSOR)) {
             return true;
@@ -39,9 +115,69 @@ public class CameraHelper {
         return false;
     }
 
+    @Override
+    public void startCamera(Context context, boolean useBackCamera, TextureView textureView) {
+        mTextureView = textureView;
+        startBackgroundThread(context);
+        try {
+            openCamera(useBackCamera);
+        } catch (RuntimeException e) {
+            showAlertDialog(context, e.getLocalizedMessage(), true);
+        }
+    }
+
+    @Override
+    public void stopCamera(Context context) {
+        stopBackgroundThread();
+        try {
+            closeCamera();
+        } catch (RuntimeException e) {
+            showAlertDialog(context, e.getLocalizedMessage(), true);
+        }
+        mTextureView = null;
+    }
+
+    /**
+     * Starts background thread that callback from camera will posted.
+     * NOTE: calls in onStart or onResume
+     */
+    private void startBackgroundThread(Context context) throws RuntimeException {
+        mBackgroundHandlerThread = new HandlerThread("CameraThread");
+        mBackgroundHandlerThread.setUncaughtExceptionHandler((thread, throwable) -> {
+            Log.d(Constants.LOG_TAG_DEBUG, "CameraHelper.startBackgroundThread(): " + throwable.getLocalizedMessage());
+            showAlertDialog(context, throwable.getLocalizedMessage(), true);
+        });
+        mBackgroundHandlerThread.start();
+        mBackgroundHandler = new Handler(mBackgroundHandlerThread.getLooper());
+    }
+
+    /**
+     * Stops background thread.
+     * NOTE: calls in onStop or onPause
+     */
+    private void stopBackgroundThread() {
+        if (mBackgroundHandlerThread != null) {
+            mBackgroundHandlerThread.quitSafely();
+            try {
+                mBackgroundHandlerThread.join();
+                mBackgroundHandlerThread = null;
+                mBackgroundHandler = null;
+            } catch (InterruptedException e) {
+                Log.e(Constants.LOG_TAG_ERROR, "CameraHelper.stopBackgroundThread: InterruptedException: " + e.getLocalizedMessage(), e);
+            }
+        }
+    }
+
+
+    /**
+     * Init camera
+     *
+     * @param context Activity context
+     * @return True - camera has been initialized
+     */
     private boolean initSCamera(Context context) {
         mSCamera = new SCamera();
-        String message = null;
+        String message;
         try {
             mSCamera.initialize(context);
             return true;
@@ -62,6 +198,285 @@ public class CameraHelper {
     }
 
     /**
+     * Open camera
+     */
+    private void openCamera(boolean useBackCamera) throws RuntimeException {
+        try {
+            if (!mCameraOpenCloseLock.tryAcquire(3000, TimeUnit.MILLISECONDS)) {
+                throw new RuntimeException("Timeout (3 sec) waiting to lock camera opening.");
+            }
+
+            //Getting camera id
+            mCameraId = getCameraId(useBackCamera);
+            if (mCameraId == null) {
+                throw new RuntimeException("Cannot open the camera. Error: camera id is null. Please, try again.");
+            }
+
+            Log.d(Constants.LOG_TAG_DEBUG, "CameraHelper.openCamera(): Camera ID " + mCameraId);
+
+            // acquires camera characteristics
+            mCharacteristics = mSCamera.getSCameraManager().getCameraCharacteristics(mCameraId);
+            mVideoParameterList.clear();
+            for (Size videoSize : mCharacteristics.get(SCameraCharacteristics.SCALER_STREAM_CONFIGURATION_MAP).getHighSpeedVideoSizes()) {
+                for (Range<Integer> fpsRange : mCharacteristics.get(SCameraCharacteristics.SCALER_STREAM_CONFIGURATION_MAP).getHighSpeedVideoFpsRangesFor(videoSize)) {
+                    //we will record constant fps video
+                    if (fpsRange.getLower().equals(fpsRange.getUpper())) {
+                        mVideoParameterList.add(new VideoParameter(videoSize, fpsRange));
+                    }
+                }
+            }
+            mVideoParameter = mVideoParameterList.get(0);
+
+            mSCameraManager = mSCamera.getSCameraManager();
+
+            // Opening the camera device
+            mSCameraManager.openCamera(mCameraId, new SCameraDevice.StateCallback() {
+                @Override
+                public void onDisconnected(SCameraDevice sCameraDevice) {
+                    mCameraOpenCloseLock.release();
+                    if (getCameraState() == CAMERA_STATE_CLOSING) return;
+                    throw new RuntimeException("Camera disconnected.");
+                }
+
+                @Override
+                public void onError(SCameraDevice sCameraDevice, int i) {
+                    mCameraOpenCloseLock.release();
+                    if (getCameraState() == CAMERA_STATE_CLOSING) return;
+                    throw new RuntimeException("Error while camera open.");
+                }
+
+                public void onOpened(SCameraDevice cameraDevice) {
+                    Log.d(Constants.LOG_TAG_DEBUG, "CameraHelper.onOpened(): " + cameraDevice.toString());
+                    mCameraOpenCloseLock.release();
+                    if (getCameraState() == CAMERA_STATE_CLOSING) return;
+                    mSCameraDevice = cameraDevice;
+
+                    prepareMediaRecorder();
+                    createPreviewSession();
+                }
+            }, mBackgroundHandler);
+
+        } catch (CameraAccessException e) {
+            throw new RuntimeException("Cannot open the camera. Error: " + e.getLocalizedMessage());
+        } catch (InterruptedException e) {
+            throw new RuntimeException("Interrupted while trying to lock camera opening. Error: " + e.getLocalizedMessage());
+        }
+    }
+
+    /**
+     * Close camera
+     */
+    private void closeCamera() throws RuntimeException {
+        try {
+            mCameraOpenCloseLock.acquire();
+
+            stopPreview();
+
+            if (mSCameraSession != null) {
+                mSCameraSession.close();
+                mSCameraSession = null;
+            }
+
+            if (mSCameraDevice != null) {
+                mSCameraDevice.close();
+                mSCameraDevice = null;
+            }
+
+            if (null != mMediaRecorder) {
+                mMediaRecorder.release();
+                mMediaRecorder = null;
+            }
+
+            mSCameraManager = null;
+            mSCamera = null;
+        } catch (InterruptedException e) {
+            throw new RuntimeException("Interrupted while trying to lock camera closing. Error: " + e.getLocalizedMessage());
+        } finally {
+            mCameraOpenCloseLock.release();
+        }
+    }
+
+    /**
+     * Determine ID of the camera
+     *
+     * @param isBackCamera True - use back camera
+     * @return Camera ID
+     * @throws CameraAccessException
+     */
+    private String getCameraId(boolean isBackCamera) throws CameraAccessException {
+        if (mSCamera == null) return null;
+        // Find camera device that facing to given facing parameter.
+        for (String id : mSCamera.getSCameraManager().getCameraIdList()) {
+            SCameraCharacteristics cameraCharacteristics = mSCamera.getSCameraManager().getCameraCharacteristics(id);
+            if (isBackCamera) {
+                if (cameraCharacteristics.get(SCameraCharacteristics.LENS_FACING) == SCameraCharacteristics.LENS_FACING_BACK) {
+                    return id;
+                }
+            } else {
+                if (cameraCharacteristics.get(SCameraCharacteristics.LENS_FACING) == SCameraCharacteristics.LENS_FACING_FRONT) {
+                    return id;
+                }
+            }
+        }
+
+        return null;
+    }
+
+    private synchronized int getCameraState() {
+        return mCameraState;
+    }
+
+    private synchronized void setCameraState(int state) {
+        mCameraState = state;
+    }
+
+    private void createPreviewSession() throws RuntimeException {
+        if (null == mSCamera || null == mSCameraDevice || null == mSCameraManager /*|| !mTextureView.isAvailable()*/)
+            return;
+
+        try {
+            mPreviewSize = mVideoParameter.getVideoSize();
+
+            setCameraState(CAMERA_STATE_START_PREVIEW);
+
+            Log.d(Constants.LOG_TAG_DEBUG, "CameraHelper.createPreviewSession(): Preview size: " + mPreviewSize + " Video size: " + mVideoParameter.getVideoSize());
+
+            // Set the aspect ratio to TextureView
+        /*    int orientation = getResources().getConfiguration().orientation;
+            if (orientation == Configuration.ORIENTATION_LANDSCAPE) {
+                mTextureView.setAspectRatio(
+                        mPreviewSize.getWidth(), mPreviewSize.getHeight());
+            } else {
+                mTextureView.setAspectRatio(
+                        mPreviewSize.getHeight(), mPreviewSize.getWidth());
+            }
+            */
+
+            SurfaceTexture texture = mTextureView.getSurfaceTexture();
+
+            // Set default buffer size to camera preview size.
+            texture.setDefaultBufferSize(mPreviewSize.getWidth(), mPreviewSize.getHeight());
+
+            Surface previewSurface = new Surface(texture);
+            Surface recorderSurface = mMediaRecorder.getSurface();
+
+            // Creates SCaptureRequest.Builder for preview and recording with output target.
+            mPreviewBuilder = mSCameraDevice.createCaptureRequest(SCameraDevice.TEMPLATE_RECORD);
+
+            // {@link com.samsung.android.sdk.camera.processor.SCameraEffectProcessor} supports only 24fps.
+            mPreviewBuilder.set(SCaptureRequest.CONTROL_AE_TARGET_FPS_RANGE, mVideoParameter.getFpsRange());
+            mPreviewBuilder.set(SCaptureRequest.CONTROL_AF_MODE, SCaptureRequest.CONTROL_AF_MODE_CONTINUOUS_VIDEO);
+            //mPreviewBuilder.set(SCaptureRequest.CONTROL_SCENE_MODE, SCaptureRequest.CONTROL_SCENE_MODE_HIGH_SPEED_VIDEO);
+            mPreviewBuilder.addTarget(previewSurface);
+            mPreviewBuilder.addTarget(recorderSurface);
+
+            // limit preview fps up to 30.
+            int requestListSize = mVideoParameter.mFpsRange.getUpper() > 30 ? mVideoParameter.mFpsRange.getUpper() / 30 : 1;
+
+            mRepeatingList = new ArrayList<>();
+            mRepeatingList.add(mPreviewBuilder.build());
+            mPreviewBuilder.removeTarget(previewSurface);
+            for (int i = 0; i < requestListSize - 1; i++) {
+                mRepeatingList.add(mPreviewBuilder.build());
+            }
+
+            Log.d(Constants.LOG_TAG_DEBUG, "CameraHelper.createPreviewSession(): Request size: " + mRepeatingList.size());
+
+            // Creates a SCameraCaptureSession here.
+            List<Surface> outputSurface = Arrays.asList(previewSurface, recorderSurface);
+            mSCameraDevice.createCaptureSession(outputSurface, new SCameraCaptureSession.StateCallback() {
+                @Override
+                public void onConfigureFailed(SCameraCaptureSession sCameraCaptureSession) {
+                    if (getCameraState() == CAMERA_STATE_CLOSING) return;
+                    throw new RuntimeException("Fail to create camera capture session.");
+                }
+
+                @Override
+                public void onConfigured(SCameraCaptureSession sCameraCaptureSession) {
+                    if (getCameraState() == CAMERA_STATE_CLOSING) return;
+                    mSCameraSession = sCameraCaptureSession;
+
+                    startPreview();
+                }
+            }, mBackgroundHandler);
+
+        } catch (CameraAccessException e) {
+            throw new RuntimeException("Failed to create camera capture session. Error: " + e.getLocalizedMessage());
+        }
+    }
+
+    /**
+     * Prepares the media recorder to begin recording.
+     */
+    private void prepareMediaRecorder() throws RuntimeException {
+        try {
+            mMediaRecorder = new MediaRecorder();
+            mMediaRecorder.setVideoSource(MediaRecorder.VideoSource.SURFACE);
+            mMediaRecorder.setOutputFormat(MediaRecorder.OutputFormat.MPEG_4);
+            mMediaRecorder.setOutputFile(new File(mFilesDir, "temp.mp4").getAbsolutePath());
+
+            int bitrate = 384000;
+            if (mVideoParameter.getVideoSize().getWidth() * mVideoParameter.getVideoSize().getHeight() >= 1920 * 1080) {
+                bitrate = 14000000;
+            } else if (mVideoParameter.getVideoSize().getWidth() * mVideoParameter.getVideoSize().getHeight() >= 1280 * 720) {
+                bitrate = 9730000;
+            } else if (mVideoParameter.getVideoSize().getWidth() * mVideoParameter.getVideoSize().getHeight() >= 640 * 480) {
+                bitrate = 2500000;
+            } else if (mVideoParameter.getVideoSize().getWidth() * mVideoParameter.getVideoSize().getHeight() >= 320 * 240) {
+                bitrate = 622000;
+            }
+            mMediaRecorder.setVideoEncodingBitRate(bitrate);
+
+            mMediaRecorder.setVideoFrameRate(mVideoParameter.getFpsRange().getUpper());
+            mMediaRecorder.setVideoSize(mVideoParameter.getVideoSize().getWidth(), mVideoParameter.getVideoSize().getHeight());
+            mMediaRecorder.setVideoEncoder(MediaRecorder.VideoEncoder.H264);
+            mMediaRecorder.setOrientationHint(getJpegOrientation());
+            mMediaRecorder.prepare();
+        } catch (IOException e) {
+            throw new RuntimeException("Prepare MediaRecorder error: " + e.getLocalizedMessage());
+        }
+    }
+
+    /**
+     * Starts a preview.
+     */
+    private void startPreview() throws RuntimeException {
+        try {
+            // Starts displaying the preview.
+            mSCameraSession.setRepeatingBurst(mRepeatingList, mSessionCaptureCallback, mBackgroundHandler);
+            setCameraState(CAMERA_STATE_PREVIEW);
+        } catch (CameraAccessException e) {
+            throw new RuntimeException("Fail to start preview. Error: " + e.getLocalizedMessage());
+        }
+    }
+
+
+    /**
+     * Stop a preview.
+     */
+    private void stopPreview() throws RuntimeException {
+        try {
+            if (mSCameraSession != null)
+                mSCameraSession.stopRepeating();
+        } catch (CameraAccessException e) {
+            throw new RuntimeException("Fail to stop preview. Error: " + e.getLocalizedMessage());
+        }
+    }
+
+    /**
+     * Returns required orientation that the jpeg picture needs to be rotated to be displayed upright.
+     */
+    private int getJpegOrientation() {
+        int degrees = mLastOrientation;
+
+        if (mCharacteristics.get(SCameraCharacteristics.LENS_FACING) == SCameraCharacteristics.LENS_FACING_FRONT) {
+            degrees = -degrees;
+        }
+
+        return (mCharacteristics.get(SCameraCharacteristics.SENSOR_ORIENTATION) + degrees + 360) % 360;
+    }
+
+    /**
      * Shows alert dialog.
      */
     private void showAlertDialog(final Context context, String message, final boolean finishActivity) {
@@ -78,11 +493,50 @@ public class CameraHelper {
                     }
                 }).setCancelable(false);
 
-        ((Activity) context).runOnUiThread(new Runnable() {
-            @Override
-            public void run() {
+
+        ((Activity) context).runOnUiThread(() -> {
+            try {
                 dialog.show();
+            } catch (Exception e) {
+                Log.e(Constants.LOG_TAG_ERROR, "CameraHelper.showAlertDialog: " + e.getLocalizedMessage(), e);
             }
         });
+
     }
+
+
+    /**
+     * Model class for Video parameters
+     */
+    private static class VideoParameter {
+        private Size mVideoSize;
+        private Range<Integer> mFpsRange;
+
+        VideoParameter(Size videoSize, Range<Integer> fpsRange) {
+            mVideoSize = new Size(videoSize.getWidth(), videoSize.getHeight());
+            mFpsRange = new Range<>(fpsRange.getLower(), fpsRange.getUpper());
+        }
+
+        Size getVideoSize() {
+            return mVideoSize;
+        }
+
+        Range<Integer> getFpsRange() {
+            return mFpsRange;
+        }
+
+        @Override
+        public boolean equals(Object o) {
+            return o instanceof VideoParameter &&
+                    mVideoSize.equals(((VideoParameter) o).mVideoSize) &&
+                    mFpsRange.equals(((VideoParameter) o).mFpsRange);
+        }
+
+        @Override
+        public String toString() {
+            return mVideoSize.toString() + " @ " + mFpsRange.getUpper() + "FPS";
+        }
+    }
+
+
 }

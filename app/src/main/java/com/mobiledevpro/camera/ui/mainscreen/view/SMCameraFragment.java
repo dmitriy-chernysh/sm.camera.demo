@@ -108,6 +108,7 @@ public class SMCameraFragment extends BaseFragment implements ISMCamera.View, Te
     @Override
     public void onDestroy() {
         if (mButterKnife != null) mButterKnife.unbind();
+        mPresenter.unbindView();
         super.onDestroy();
     }
 
@@ -118,7 +119,7 @@ public class SMCameraFragment extends BaseFragment implements ISMCamera.View, Te
 
     @Override
     public void onSurfaceTextureUpdated(SurfaceTexture surfaceTexture) {
-        Log.d(Constants.LOG_TAG_DEBUG, "SMCameraFragment.onSurfaceTextureUpdated(): ");
+        //Log.d(Constants.LOG_TAG_DEBUG, "SMCameraFragment.onSurfaceTextureUpdated(): ");
     }
 
     @Override

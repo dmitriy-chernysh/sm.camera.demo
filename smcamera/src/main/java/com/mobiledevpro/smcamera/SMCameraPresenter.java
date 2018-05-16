@@ -12,7 +12,6 @@ import android.util.Log;
 import com.mobiledevpro.commons.helpers.BasePermissionsHelper;
 
 import java.io.File;
-import java.io.IOException;
 
 /**
  * Presenter for main screen
@@ -50,7 +49,7 @@ public class SMCameraPresenter implements ISMCamera.Presenter {
         mCameraPreview.setAspectRatio(16, 9);
         mView.setFullAspectRatio(mIsAspectRationFull);
 
-        mCameraHelper = CameraHelper.get(mView.getActivity());
+        mCameraHelper = CameraHelper.init(mView.getActivity());
 
         //check if it's a Samsung device
         if (!mCameraHelper.isThisSamsungDevice()) {
@@ -60,7 +59,7 @@ public class SMCameraPresenter implements ISMCamera.Presenter {
                     .setPositiveButton(R.string.button_ok, new DialogInterface.OnClickListener() {
                         @Override
                         public void onClick(DialogInterface dialogInterface, int i) {
-                            mView.getActivity().finish();
+                            // mView.getActivity().finish();
                         }
                     })
                     .create()
@@ -111,19 +110,26 @@ public class SMCameraPresenter implements ISMCamera.Presenter {
     }
 
     private void startCameraPreview() {
+        if (mView == null) return;
+        /*
         try {
             mCamera = Camera.open();
             mCamera.setPreviewTexture(mSurfaceTexture);
             mCamera.startPreview();
         } catch (IOException | RuntimeException e) {
             Log.e(Constants.LOG_TAG_ERROR, "MainPresenter.onCameraViewAvailable: ", e);
-        }
+        }*/
+        if (mCameraHelper != null)
+            mCameraHelper.startCamera(mView.getActivity(), true, mCameraPreview);
     }
 
     private void stopCameraPreview() {
-        if (mCamera == null) return;
+        if (mView == null) return;
+      /*  if (mCamera == null) return;
         mCamera.stopPreview();
-        mCamera.release();
+        mCamera.release();*/
+        if (mCameraHelper != null)
+            mCameraHelper.stopCamera(mView.getActivity());
     }
 
     private void checkRuntimePermissions() {
