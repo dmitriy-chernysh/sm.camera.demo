@@ -1,9 +1,7 @@
 package com.mobiledevpro.smcamera;
 
-import android.content.DialogInterface;
 import android.content.pm.PackageManager;
 import android.graphics.SurfaceTexture;
-import android.hardware.Camera;
 import android.support.annotation.NonNull;
 import android.support.v4.app.Fragment;
 import android.support.v7.app.AlertDialog;
@@ -29,9 +27,10 @@ public class SMCameraPresenter implements ISMCamera.Presenter {
 
     private ISMCamera.View mView;
 
-    private Camera mCamera;
-    private SurfaceTexture mSurfaceTexture;
+    //private Camera mCamera;
+    //private SurfaceTexture mSurfaceTexture;
     private AutoFitTextureView mCameraPreview;
+    private int mTextureWidth, mTextureHeight;
 
     private boolean mIsVideoRecording;
     private boolean mIsAspectRationFull = true;
@@ -41,8 +40,6 @@ public class SMCameraPresenter implements ISMCamera.Presenter {
     @Override
     public void bindView(ISMCamera.View view) {
         mView = view;
-        //check permissions to use camera and microphone
-        checkRuntimePermissions();
 
         mCameraPreview = mView.getCameraPreview();
         //ratio by default
@@ -56,11 +53,8 @@ public class SMCameraPresenter implements ISMCamera.Presenter {
             new AlertDialog.Builder(mView.getActivity(), R.style.CommonAppTheme_AlertDialog)
                     .setTitle(R.string.dialog_title_error)
                     .setMessage("This is not a Samsung camera")
-                    .setPositiveButton(R.string.button_ok, new DialogInterface.OnClickListener() {
-                        @Override
-                        public void onClick(DialogInterface dialogInterface, int i) {
-                            // mView.getActivity().finish();
-                        }
+                    .setPositiveButton(R.string.button_ok, (dialogInterface, i) -> {
+                        // mView.getActivity().finish();
                     })
                     .create()
                     .show();
@@ -77,9 +71,12 @@ public class SMCameraPresenter implements ISMCamera.Presenter {
 
 
     @Override
-    public void onCameraViewAvailable(SurfaceTexture surfaceTexture) {
-        mSurfaceTexture = surfaceTexture;
-        startCameraPreview();
+    public void onCameraViewAvailable(SurfaceTexture surfaceTexture, int width, int height) {
+        // mSurfaceTexture = surfaceTexture;
+        mTextureWidth = width;
+        mTextureHeight = height;
+        //check permissions to use camera and microphone
+        checkRuntimePermissions();
     }
 
     @Override
@@ -119,8 +116,16 @@ public class SMCameraPresenter implements ISMCamera.Presenter {
         } catch (IOException | RuntimeException e) {
             Log.e(Constants.LOG_TAG_ERROR, "MainPresenter.onCameraViewAvailable: ", e);
         }*/
-        if (mCameraHelper != null)
-            mCameraHelper.startCamera(mView.getActivity(), true, mCameraPreview);
+        if (mCameraHelper != null) {
+            mCameraHelper.startCamera(
+                    mView.getActivity(),
+                    true,
+                    mCameraPreview,
+                    mTextureWidth,
+                    mTextureHeight,
+                    mView.getActivity().getWindow().getWindowManager().getDefaultDisplay().getRotation()
+            );
+        }
     }
 
     private void stopCameraPreview() {

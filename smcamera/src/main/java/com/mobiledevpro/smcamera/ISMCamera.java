@@ -34,7 +34,7 @@ public interface ISMCamera {
 
         void unbindView();
 
-        void onCameraViewAvailable(SurfaceTexture surfaceTexture);
+        void onCameraViewAvailable(SurfaceTexture surfaceTexture, int width, int height);
 
         void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults);
 

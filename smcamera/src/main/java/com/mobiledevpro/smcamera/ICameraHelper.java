@@ -19,7 +19,12 @@ public interface ICameraHelper {
      */
     boolean isThisSamsungDevice();
 
-    void startCamera(Context context, boolean useBackCamera, TextureView textureView);
+    void startCamera(Context context,
+                     boolean useBackCamera,
+                     TextureView textureView,
+                     int textureWidth,
+                     int textureHeight,
+                     int rotation);
 
     void stopCamera(Context context);
 }

@@ -5,6 +5,8 @@ import android.app.Activity;
 import android.app.AlertDialog;
 import android.content.Context;
 import android.content.DialogInterface;
+import android.graphics.Matrix;
+import android.graphics.RectF;
 import android.graphics.SurfaceTexture;
 import android.hardware.camera2.CameraAccessException;
 import android.media.MediaRecorder;
@@ -67,9 +69,8 @@ class CameraHelper implements ICameraHelper {
     private String mCameraId;
     private int mCameraState = CAMERA_STATE_IDLE;
 
-    private int mLastOrientation = 90;
+    private int mLastOrientation = 0;
     private Size mPreviewSize;
-    private List<VideoParameter> mVideoParameterList = new ArrayList<>();
     private VideoParameter mVideoParameter;
     private TextureView mTextureView;
 
@@ -116,11 +117,19 @@ class CameraHelper implements ICameraHelper {
     }
 
     @Override
-    public void startCamera(Context context, boolean useBackCamera, TextureView textureView) {
+    public void startCamera(Context context,
+                            boolean useBackCamera,
+                            TextureView textureView,
+                            int textureWidth,
+                            int textureHeight,
+                            int rotation) {
         mTextureView = textureView;
+        Log.d(Constants.LOG_TAG_DEBUG, "CameraHelper.startCamera(): Texture W " + mTextureView.getWidth() + " H " + mTextureView.getHeight());
         startBackgroundThread(context);
         try {
-            openCamera(useBackCamera);
+            configureCameraParameters(useBackCamera);
+            configureTextureViewTransform(textureWidth, textureHeight, rotation);
+            openCamera();
         } catch (RuntimeException e) {
             showAlertDialog(context, e.getLocalizedMessage(), true);
         }
@@ -197,10 +206,7 @@ class CameraHelper implements ICameraHelper {
         return false;
     }
 
-    /**
-     * Open camera
-     */
-    private void openCamera(boolean useBackCamera) throws RuntimeException {
+    private void configureCameraParameters(boolean useBackCamera) {
         try {
             if (!mCameraOpenCloseLock.tryAcquire(3000, TimeUnit.MILLISECONDS)) {
                 throw new RuntimeException("Timeout (3 sec) waiting to lock camera opening.");
@@ -209,15 +215,15 @@ class CameraHelper implements ICameraHelper {
             //Getting camera id
             mCameraId = getCameraId(useBackCamera);
             if (mCameraId == null) {
-                throw new RuntimeException("Cannot open the camera. Error: camera id is null. Please, try again.");
+                throw new RuntimeException("Cannot get camera parameters. Error: camera id is null. Please, try again.");
             }
 
             Log.d(Constants.LOG_TAG_DEBUG, "CameraHelper.openCamera(): Camera ID " + mCameraId);
 
             // acquires camera characteristics
             mCharacteristics = mSCamera.getSCameraManager().getCameraCharacteristics(mCameraId);
-            mVideoParameterList.clear();
-            for (Size videoSize : mCharacteristics.get(SCameraCharacteristics.SCALER_STREAM_CONFIGURATION_MAP).getHighSpeedVideoSizes()) {
+
+           /* for (Size videoSize : mCharacteristics.get(SCameraCharacteristics.SCALER_STREAM_CONFIGURATION_MAP).getHighSpeedVideoSizes()) {
                 for (Range<Integer> fpsRange : mCharacteristics.get(SCameraCharacteristics.SCALER_STREAM_CONFIGURATION_MAP).getHighSpeedVideoFpsRangesFor(videoSize)) {
                     //we will record constant fps video
                     if (fpsRange.getLower().equals(fpsRange.getUpper())) {
@@ -225,7 +231,26 @@ class CameraHelper implements ICameraHelper {
                     }
                 }
             }
-            mVideoParameter = mVideoParameterList.get(0);
+            */
+
+            // TODO: 18.05.18 need to add ability to change FPS from app settings (30 or 60)
+            Range<Integer> fpsRange = new Range<>(60, 60);
+            Size videoSize = new Size(1280, 720);
+            mVideoParameter = new VideoParameter(videoSize, fpsRange);
+
+            mPreviewSize = mVideoParameter.getVideoSize();
+        } catch (InterruptedException e) {
+            throw new RuntimeException("Interrupted while trying to lock camera opening. Error: " + e.getLocalizedMessage());
+        } catch (CameraAccessException e) {
+            throw new RuntimeException("Cannot get camera parameters. Error: " + e.getLocalizedMessage());
+        }
+    }
+
+    /**
+     * Open camera
+     */
+    private void openCamera() throws RuntimeException {
+        try {
 
             mSCameraManager = mSCamera.getSCameraManager();
 
@@ -258,8 +283,6 @@ class CameraHelper implements ICameraHelper {
 
         } catch (CameraAccessException e) {
             throw new RuntimeException("Cannot open the camera. Error: " + e.getLocalizedMessage());
-        } catch (InterruptedException e) {
-            throw new RuntimeException("Interrupted while trying to lock camera opening. Error: " + e.getLocalizedMessage());
         }
     }
 
@@ -335,8 +358,6 @@ class CameraHelper implements ICameraHelper {
             return;
 
         try {
-            mPreviewSize = mVideoParameter.getVideoSize();
-
             setCameraState(CAMERA_STATE_START_PREVIEW);
 
             Log.d(Constants.LOG_TAG_DEBUG, "CameraHelper.createPreviewSession(): Preview size: " + mPreviewSize + " Video size: " + mVideoParameter.getVideoSize());
@@ -353,10 +374,6 @@ class CameraHelper implements ICameraHelper {
             */
 
             SurfaceTexture texture = mTextureView.getSurfaceTexture();
-
-            // Set default buffer size to camera preview size.
-            texture.setDefaultBufferSize(mPreviewSize.getWidth(), mPreviewSize.getHeight());
-
             Surface previewSurface = new Surface(texture);
             Surface recorderSurface = mMediaRecorder.getSurface();
 
@@ -477,6 +494,36 @@ class CameraHelper implements ICameraHelper {
     }
 
     /**
+     * Configures requires transform {@link android.graphics.Matrix} to TextureView.
+     */
+    private void configureTextureViewTransform(int viewWidth, int viewHeight, int rotation) {
+
+        if (null == mTextureView || null == mPreviewSize) return;
+
+        Log.d(Constants.LOG_TAG_DEBUG, "CameraHelper.configureTextureViewTransform(): W " + viewWidth + " H " + viewHeight);
+        // int rotation = Surface.ROTATION_90;//mView.getActivity().getWindowManager().getDefaultDisplay().getRotation();
+        Matrix matrix = new Matrix();
+        RectF viewRect = new RectF(0, 0, viewWidth, viewHeight);
+        RectF bufferRect = new RectF(0, 0, mPreviewSize.getHeight(), mPreviewSize.getWidth());
+        float centerX = viewRect.centerX();
+        float centerY = viewRect.centerY();
+        if (Surface.ROTATION_90 == rotation || Surface.ROTATION_270 == rotation) {
+            bufferRect.offset(centerX - bufferRect.centerX(), centerY - bufferRect.centerY());
+            matrix.setRectToRect(viewRect, bufferRect, Matrix.ScaleToFit.FILL);
+            float scale = Math.max(
+                    (float) viewHeight / mPreviewSize.getHeight(),
+                    (float) viewWidth / mPreviewSize.getWidth());
+            matrix.postScale(scale, scale, centerX, centerY);
+            matrix.postRotate(90 * (rotation - 2), centerX, centerY);
+        } else {
+            matrix.postRotate(90 * rotation, centerX, centerY);
+        }
+
+        mTextureView.setTransform(matrix);
+        mTextureView.getSurfaceTexture().setDefaultBufferSize(mPreviewSize.getWidth(), mPreviewSize.getHeight());
+    }
+
+    /**
      * Shows alert dialog.
      */
     private void showAlertDialog(final Context context, String message, final boolean finishActivity) {
@@ -515,6 +562,7 @@ class CameraHelper implements ICameraHelper {
         VideoParameter(Size videoSize, Range<Integer> fpsRange) {
             mVideoSize = new Size(videoSize.getWidth(), videoSize.getHeight());
             mFpsRange = new Range<>(fpsRange.getLower(), fpsRange.getUpper());
+            //mFpsRange = new Range<>(30, 30);
         }
 
         Size getVideoSize() {

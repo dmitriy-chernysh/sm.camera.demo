@@ -137,7 +137,7 @@ public class SMCameraFragment extends BaseFragment implements ISMCamera.View, Te
     @Override
     public void onSurfaceTextureAvailable(SurfaceTexture surfaceTexture, int i, int i1) {
         Log.d(Constants.LOG_TAG_DEBUG, "SMCameraFragment.onSurfaceTextureAvailable(): ");
-        mPresenter.onCameraViewAvailable(surfaceTexture);
+        mPresenter.onCameraViewAvailable(surfaceTexture, i, i1);
     }
 
     @Override
