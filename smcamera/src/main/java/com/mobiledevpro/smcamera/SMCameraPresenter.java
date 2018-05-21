@@ -5,7 +5,6 @@ import android.graphics.SurfaceTexture;
 import android.support.annotation.NonNull;
 import android.support.v4.app.Fragment;
 import android.support.v7.app.AlertDialog;
-import android.util.Log;
 
 import com.mobiledevpro.commons.helpers.BasePermissionsHelper;
 
@@ -38,7 +37,7 @@ public class SMCameraPresenter implements ISMCamera.Presenter {
 
 
     @Override
-    public void bindView(ISMCamera.View view) {
+    public void bindView(ISMCamera.View view, @NonNull File videoFilesDir) {
         mView = view;
 
         mCameraPreview = mView.getCameraPreview();
@@ -46,7 +45,7 @@ public class SMCameraPresenter implements ISMCamera.Presenter {
         mCameraPreview.setAspectRatio(16, 9);
         mView.setFullAspectRatio(mIsAspectRationFull);
 
-        mCameraHelper = CameraHelper.init(mView.getActivity());
+        mCameraHelper = CameraHelper.init(mView.getActivity(), videoFilesDir);
 
         //check if it's a Samsung device
         if (!mCameraHelper.isThisSamsungDevice()) {
@@ -75,8 +74,10 @@ public class SMCameraPresenter implements ISMCamera.Presenter {
         // mSurfaceTexture = surfaceTexture;
         mTextureWidth = width;
         mTextureHeight = height;
-        //check permissions to use camera and microphone
-        checkRuntimePermissions();
+        //check permissions to use camera and microphone and storage
+        if (checkRuntimePermissions()) {
+            startCameraPreview();
+        }
     }
 
     @Override
@@ -91,12 +92,12 @@ public class SMCameraPresenter implements ISMCamera.Presenter {
     }
 
     @Override
-    public void onVideoRecordButtonClick(File newVideoFile) {
+    public void onVideoRecordButtonClick() {
         mIsVideoRecording = !mIsVideoRecording;
         mView.setRecordingState(mIsVideoRecording);
 
-        Log.d(Constants.LOG_TAG_DEBUG, "SMCameraPresenter.onVideoRecordButtonClick(): newVideoFile: " + newVideoFile);
-        //start or stop record video
+        //start/stop recording
+        mCameraHelper.startStopVideoRecording();
     }
 
     @Override
@@ -108,14 +109,6 @@ public class SMCameraPresenter implements ISMCamera.Presenter {
 
     private void startCameraPreview() {
         if (mView == null) return;
-        /*
-        try {
-            mCamera = Camera.open();
-            mCamera.setPreviewTexture(mSurfaceTexture);
-            mCamera.startPreview();
-        } catch (IOException | RuntimeException e) {
-            Log.e(Constants.LOG_TAG_ERROR, "MainPresenter.onCameraViewAvailable: ", e);
-        }*/
         if (mCameraHelper != null) {
             mCameraHelper.startCamera(
                     mView.getActivity(),
@@ -130,18 +123,18 @@ public class SMCameraPresenter implements ISMCamera.Presenter {
 
     private void stopCameraPreview() {
         if (mView == null) return;
-      /*  if (mCamera == null) return;
-        mCamera.stopPreview();
-        mCamera.release();*/
         if (mCameraHelper != null)
             mCameraHelper.stopCamera(mView.getActivity());
     }
 
-    private void checkRuntimePermissions() {
-        if (BasePermissionsHelper.isCaptureVideoPermissionsGranted(mView.getActivity())) return;
+    private boolean checkRuntimePermissions() {
+        if (BasePermissionsHelper.isCaptureVideoPermissionsGranted(mView.getActivity()))
+            return true;
         BasePermissionsHelper.requestCaptureVideoPermissions(
                 (Fragment) mView,
                 CODE_REQUEST_PERMISSION_CAMERA
         );
+
+        return false;
     }
 }

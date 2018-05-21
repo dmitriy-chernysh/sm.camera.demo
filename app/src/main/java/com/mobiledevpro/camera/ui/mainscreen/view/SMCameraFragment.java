@@ -96,7 +96,10 @@ public class SMCameraFragment extends BaseFragment implements ISMCamera.View, Te
     @Override
     public void onStart() {
         super.onStart();
-        mPresenter.bindView(this);
+        mPresenter.bindView(
+                this,
+                StorageHelper.get(App.getAppContext()).getVideoFilesDir()
+        );
     }
 
     @Override
@@ -157,9 +160,7 @@ public class SMCameraFragment extends BaseFragment implements ISMCamera.View, Te
 
     @OnClick(R.id.btn_record_start_stop)
     void onVideoRecordButtonClick(ImageButton button) {
-        mPresenter.onVideoRecordButtonClick(
-                StorageHelper.get(App.getAppContext()).createNewVideoFile()
-        );
+        mPresenter.onVideoRecordButtonClick();
     }
 
     @OnClick(R.id.btn_aspect)

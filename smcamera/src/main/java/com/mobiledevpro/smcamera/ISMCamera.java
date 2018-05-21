@@ -30,7 +30,7 @@ public interface ISMCamera {
 
     interface Presenter {
 
-        void bindView(ISMCamera.View view);
+        void bindView(ISMCamera.View view, @NonNull File videoFilesDir);
 
         void unbindView();
 
@@ -38,7 +38,7 @@ public interface ISMCamera {
 
         void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults);
 
-        void onVideoRecordButtonClick(File newVideoFile);
+        void onVideoRecordButtonClick();
 
         void onAspectRatioButtonClick();
     }

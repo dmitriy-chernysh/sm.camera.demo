@@ -12,6 +12,7 @@ import android.hardware.camera2.CameraAccessException;
 import android.media.MediaRecorder;
 import android.os.Handler;
 import android.os.HandlerThread;
+import android.support.annotation.NonNull;
 import android.util.Log;
 import android.util.Range;
 import android.util.Size;
@@ -29,9 +30,12 @@ import com.samsung.android.sdk.camera.STotalCaptureResult;
 
 import java.io.File;
 import java.io.IOException;
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Date;
 import java.util.List;
+import java.util.Locale;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 
@@ -69,7 +73,7 @@ class CameraHelper implements ICameraHelper {
     private String mCameraId;
     private int mCameraState = CAMERA_STATE_IDLE;
 
-    private int mLastOrientation = 0;
+    private int mLastOrientation = 270;
     private Size mPreviewSize;
     private VideoParameter mVideoParameter;
     private TextureView mTextureView;
@@ -78,7 +82,7 @@ class CameraHelper implements ICameraHelper {
     private Handler mBackgroundHandler;
 
     private MediaRecorder mMediaRecorder;
-    private File mFilesDir;
+    private File mVideoFilesDir;
 
     private SCameraCaptureSession.CaptureCallback mSessionCaptureCallback = new SCameraCaptureSession.CaptureCallback() {
         @Override
@@ -97,13 +101,14 @@ class CameraHelper implements ICameraHelper {
         }
     };
 
-    private CameraHelper(Context context) {
-        mFilesDir = context.getExternalFilesDir(null);
+    private CameraHelper(@NonNull Context context, @NonNull File videoFilesDir) {
+        mVideoFilesDir = videoFilesDir;
+        Log.d(Constants.LOG_TAG_DEBUG, "CameraHelper.CameraHelper(): Video files dir: " + mVideoFilesDir);
         initSCamera(context);
     }
 
-    public static CameraHelper init(Context context) {
-        if (sHelper == null) sHelper = new CameraHelper(context);
+    public static CameraHelper init(@NonNull Context context, @NonNull File videoFilesDir) {
+        if (sHelper == null) sHelper = new CameraHelper(context, videoFilesDir);
         return sHelper;
     }
 
@@ -144,6 +149,28 @@ class CameraHelper implements ICameraHelper {
             showAlertDialog(context, e.getLocalizedMessage(), true);
         }
         mTextureView = null;
+    }
+
+    @Override
+    public synchronized void startStopVideoRecording() {
+        if (getCameraState() == CAMERA_STATE_PREVIEW) {
+            setCameraState(CAMERA_STATE_RECORD_VIDEO);
+            //start video recording
+            mMediaRecorder.start();
+            Log.d(Constants.LOG_TAG_DEBUG, "CameraHelper.startStopVideoRecording(): START RECORD");
+        } else if (getCameraState() == CAMERA_STATE_RECORD_VIDEO) {
+            //stop video recording
+            mMediaRecorder.stop();
+            mMediaRecorder.reset();
+            Log.d(Constants.LOG_TAG_DEBUG, "CameraHelper.startStopVideoRecording(): STOP RECORD");
+
+            mBackgroundHandler.post(() -> {
+                prepareMediaRecorder();
+                //start preview again
+                createPreviewSession();
+            });
+
+        }
     }
 
     /**
@@ -234,7 +261,7 @@ class CameraHelper implements ICameraHelper {
             */
 
             // TODO: 18.05.18 need to add ability to change FPS from app settings (30 or 60)
-            Range<Integer> fpsRange = new Range<>(60, 60);
+            Range<Integer> fpsRange = new Range<>(30, 30);
             Size videoSize = new Size(1280, 720);
             mVideoParameter = new VideoParameter(videoSize, fpsRange);
 
@@ -430,7 +457,7 @@ class CameraHelper implements ICameraHelper {
             mMediaRecorder = new MediaRecorder();
             mMediaRecorder.setVideoSource(MediaRecorder.VideoSource.SURFACE);
             mMediaRecorder.setOutputFormat(MediaRecorder.OutputFormat.MPEG_4);
-            mMediaRecorder.setOutputFile(new File(mFilesDir, "temp.mp4").getAbsolutePath());
+            mMediaRecorder.setOutputFile(createNewVideoFile().getAbsolutePath());
 
             int bitrate = 384000;
             if (mVideoParameter.getVideoSize().getWidth() * mVideoParameter.getVideoSize().getHeight() >= 1920 * 1080) {
@@ -549,6 +576,18 @@ class CameraHelper implements ICameraHelper {
             }
         });
 
+    }
+
+    /**
+     * Get path for next Video file
+     *
+     * @return String File Name
+     */
+    private File createNewVideoFile() throws RuntimeException {
+        if (!mVideoFilesDir.exists()) mVideoFilesDir.mkdirs();
+        String timeStamp = new SimpleDateFormat("yyyyMMdd_HHmmssSSS", Locale.getDefault()).format(new Date());
+        //return File.createTempFile(, mVideoFilesDir);
+        return new File(mVideoFilesDir + File.separator + "temp_video_" + timeStamp + ".mp4");
     }
 
 

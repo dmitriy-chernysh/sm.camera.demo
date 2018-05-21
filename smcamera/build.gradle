@@ -34,5 +34,5 @@ dependencies {
     implementation fileTree(dir: 'libs', include: ['*.jar'])
 
     //commons-ui
-    implementation 'com.github.mobile-dev-pro:commons-ui:1.0.5'
+    implementation 'com.github.mobile-dev-pro:commons-ui:1.0.6'
 }

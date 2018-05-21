@@ -27,4 +27,9 @@ public interface ICameraHelper {
                      int rotation);
 
     void stopCamera(Context context);
+
+    /**
+     * Start or stop video recording
+     */
+    void startStopVideoRecording();
 }

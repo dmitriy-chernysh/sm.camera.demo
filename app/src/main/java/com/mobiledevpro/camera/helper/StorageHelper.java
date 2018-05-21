@@ -42,8 +42,19 @@ public class StorageHelper {
      */
     public File createNewVideoFile() {
         String timeStamp = new SimpleDateFormat("yyyyMMdd_HHmmssSSS", Locale.getDefault()).format(new Date());
-        String fileName = mAppFolder + File.separator + VIDEO_FOLDER_NAME + File.separator + "sm_video_" + timeStamp + ".mp4";
+        String fileName = mAppFolder + File.separator + VIDEO_FOLDER_NAME + File.separator + "temp_video_" + timeStamp + ".mp4";
         File file = new File(fileName);
+        if (!file.exists()) file.mkdirs();
+        return file;
+    }
+
+    /**
+     * Get path for video files
+     *
+     * @return File path
+     */
+    public File getVideoFilesDir() {
+        File file = new File(mAppFolder + File.separator + VIDEO_FOLDER_NAME);
         if (!file.exists()) file.mkdirs();
         return file;
     }
