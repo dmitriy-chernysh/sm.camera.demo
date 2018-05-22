@@ -104,7 +104,9 @@ public class SMCameraFragment extends BaseFragment implements ISMCamera.View, Te
                 this,
                 StorageHelper.get(App.getAppContext()).getVideoFilesDir(),
                 StorageHelper.get(App.getAppContext()).getPhotoFilesDir(),
-                new CameraSettings().setVideoStabilisationEnabled(true)
+                new CameraSettings()
+                        .setVideoStabilisationEnabled(true)
+                        .setAudioEnabled(true)
         );
     }
 

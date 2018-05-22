@@ -542,6 +542,9 @@ class CameraHelper implements ICameraHelper {
             mRecordedVideoFile = createNewVideoFile();
             mMediaRecorder = new MediaRecorder();
             mMediaRecorder.setVideoSource(MediaRecorder.VideoSource.SURFACE);
+            if (mCameraExternalSettings != null && mCameraExternalSettings.isAudioEnabled())
+                mMediaRecorder.setAudioSource(MediaRecorder.AudioSource.MIC);
+
             mMediaRecorder.setOutputFormat(MediaRecorder.OutputFormat.MPEG_4);
             mMediaRecorder.setOutputFile(mRecordedVideoFile.getAbsolutePath());
 
@@ -560,7 +563,8 @@ class CameraHelper implements ICameraHelper {
             mMediaRecorder.setVideoFrameRate(mVideoParameter.getFpsRange().getUpper());
             mMediaRecorder.setVideoSize(mVideoParameter.getVideoSize().getWidth(), mVideoParameter.getVideoSize().getHeight());
             mMediaRecorder.setVideoEncoder(MediaRecorder.VideoEncoder.H264);
-            //mMediaRecorder.setAudioEncoder(MediaRecorder.AudioEncoder.AAC);
+            if (mCameraExternalSettings != null && mCameraExternalSettings.isAudioEnabled())
+                mMediaRecorder.setAudioEncoder(MediaRecorder.AudioEncoder.AMR_NB);
             mMediaRecorder.setOrientationHint(getJpegOrientation());
             mMediaRecorder.prepare();
         } catch (IOException e) {

@@ -125,13 +125,13 @@ public class SMCameraPresenter implements ISMCamera.Presenter,
 
     @Override
     public void onVideoCaptureFinished(File outputVideoFile) {
-        if (outputVideoFile == null) return;
+        if (outputVideoFile == null || mView == null) return;
         Toast.makeText(mView.getActivity(), outputVideoFile.getAbsolutePath(), Toast.LENGTH_SHORT).show();
     }
 
     @Override
     public void onPhotoCaptureFinished(File outputPhotoFile) {
-        if (outputPhotoFile == null) return;
+        if (outputPhotoFile == null || mView == null) return;
         Toast.makeText(mView.getActivity(), outputPhotoFile.getAbsolutePath(), Toast.LENGTH_SHORT).show();
     }
 
