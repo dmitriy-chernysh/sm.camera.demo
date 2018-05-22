@@ -45,6 +45,9 @@ public class SMCameraFragment extends BaseFragment implements ISMCamera.View, Te
     @BindView(R.id.btn_record_start_stop)
     ImageButton mBtnVideoRecord;
 
+    @BindView(R.id.btn_take_picture)
+    ImageButton mBtnTakePicture;
+
     @BindView(R.id.btn_aspect)
     ImageButton mBtnAspectRation;
 
@@ -164,6 +167,11 @@ public class SMCameraFragment extends BaseFragment implements ISMCamera.View, Te
     @OnClick(R.id.btn_record_start_stop)
     void onVideoRecordButtonClick(ImageButton button) {
         mPresenter.onVideoRecordButtonClick();
+    }
+
+    @OnClick(R.id.btn_take_picture)
+    void onPhotoCaptureButtonClick(ImageButton button) {
+        mPresenter.onPhotoCaptureButtonClick();
     }
 
     @OnClick(R.id.btn_aspect)

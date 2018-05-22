@@ -5,10 +5,13 @@ import android.app.Activity;
 import android.app.AlertDialog;
 import android.content.Context;
 import android.content.DialogInterface;
+import android.graphics.ImageFormat;
 import android.graphics.Matrix;
 import android.graphics.RectF;
 import android.graphics.SurfaceTexture;
 import android.hardware.camera2.CameraAccessException;
+import android.media.Image;
+import android.media.ImageReader;
 import android.media.MediaRecorder;
 import android.os.Handler;
 import android.os.HandlerThread;
@@ -25,13 +28,15 @@ import com.samsung.android.sdk.camera.SCameraCaptureSession;
 import com.samsung.android.sdk.camera.SCameraCharacteristics;
 import com.samsung.android.sdk.camera.SCameraDevice;
 import com.samsung.android.sdk.camera.SCameraManager;
+import com.samsung.android.sdk.camera.SCaptureFailure;
 import com.samsung.android.sdk.camera.SCaptureRequest;
 import com.samsung.android.sdk.camera.STotalCaptureResult;
 
 import java.io.File;
+import java.io.FileOutputStream;
 import java.io.IOException;
+import java.nio.ByteBuffer;
 import java.text.SimpleDateFormat;
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Date;
 import java.util.List;
@@ -56,6 +61,7 @@ class CameraHelper implements ICameraHelper {
     private static final int CAMERA_STATE_PREVIEW = 2;
     private static final int CAMERA_STATE_RECORD_VIDEO = 3;
     private static final int CAMERA_STATE_CLOSING = 4;
+    private static final int CAMERA_STATE_TAKE_PICTURE = 5;
 
     private static CameraHelper sHelper;
 
@@ -68,7 +74,9 @@ class CameraHelper implements ICameraHelper {
     private SCameraCaptureSession mSCameraSession;
     private SCameraCharacteristics mCharacteristics;
     private SCaptureRequest.Builder mPreviewBuilder;
-    private List<SCaptureRequest> mRepeatingList;
+    private SCaptureRequest.Builder mPhotoCaptureBuilder;
+    private ImageReader mImageReader;
+    private ImageSaver mImageSaver = new ImageSaver();
 
     private String mCameraId;
     private int mCameraState = CAMERA_STATE_IDLE;
@@ -105,6 +113,13 @@ class CameraHelper implements ICameraHelper {
                     break;
             }
         }
+    };
+
+    private ImageReader.OnImageAvailableListener mImageCallback = reader -> {
+        if (getCameraState() == CAMERA_STATE_CLOSING)
+            return;
+        Image image = reader.acquireNextImage();
+        mImageSaver.save(image, createNewPhotoFile());
     };
 
     private CameraHelper(@NonNull Context context,
@@ -184,6 +199,25 @@ class CameraHelper implements ICameraHelper {
                 createPreviewSession();
             });
 
+        }
+    }
+
+    @Override
+    public synchronized void takePicture() {
+        if (getCameraState() == CAMERA_STATE_CLOSING) return;
+        // Sets orientation
+        mPhotoCaptureBuilder.set(SCaptureRequest.JPEG_ORIENTATION, getJpegOrientation());
+        try {
+            mSCameraSession.capture(mPhotoCaptureBuilder.build(), new SCameraCaptureSession.CaptureCallback() {
+                @Override
+                public void onCaptureFailed(SCameraCaptureSession session, SCaptureRequest request, SCaptureFailure failure) {
+                    if (getCameraState() == CAMERA_STATE_CLOSING) return;
+                    throw new RuntimeException("Photo capture failed. Error: " + failure.toString());
+                }
+            }, mBackgroundHandler);
+            //  setCameraState(CAMERA_STATE_TAKE_PICTURE);
+        } catch (CameraAccessException e) {
+            throw new RuntimeException("Photo capture failed. Error: " + e.getLocalizedMessage());
         }
     }
 
@@ -279,6 +313,13 @@ class CameraHelper implements ICameraHelper {
             Size videoSize = new Size(1280, 720);
             mVideoParameter = new VideoParameter(videoSize, fpsRange);
 
+            Size photoSize = new Size(1280, 720);
+
+            // Configures an ImageReader
+            mImageReader = ImageReader.newInstance(photoSize.getWidth(), photoSize.getHeight(), ImageFormat.JPEG, 1);
+            mImageReader.setOnImageAvailableListener(mImageCallback, mBackgroundHandler);
+
+
             mPreviewSize = mVideoParameter.getVideoSize();
         } catch (InterruptedException e) {
             throw new RuntimeException("Interrupted while trying to lock camera opening. Error: " + e.getLocalizedMessage());
@@ -346,6 +387,11 @@ class CameraHelper implements ICameraHelper {
                 mSCameraDevice = null;
             }
 
+            if (mImageReader != null) {
+                mImageReader.close();
+                mImageReader = null;
+            }
+
             if (null != mMediaRecorder) {
                 mMediaRecorder.release();
                 mMediaRecorder = null;
@@ -407,27 +453,35 @@ class CameraHelper implements ICameraHelper {
             Surface previewSurface = new Surface(texture);
             Surface recorderSurface = mMediaRecorder.getSurface();
 
-            // Creates SCaptureRequest.Builder for preview and recording with output target.
+            // Create a request for video recording.
             mPreviewBuilder = mSCameraDevice.createCaptureRequest(SCameraDevice.TEMPLATE_RECORD);
+            mPreviewBuilder.set(SCaptureRequest.CONTROL_AE_TARGET_FPS_RANGE, mVideoParameter.getFpsRange());
+            mPreviewBuilder.set(SCaptureRequest.CONTROL_AF_MODE, SCaptureRequest.CONTROL_AF_MODE_CONTINUOUS_PICTURE);
+            //setup video stabilization
+            setVideoStabilization(mCameraExternalSettings != null && mCameraExternalSettings.isVideoStabilisationEnabled());
+            mPreviewBuilder.addTarget(previewSurface);
+            mPreviewBuilder.addTarget(recorderSurface);
+
+            // Create a request for image capture
+            mPhotoCaptureBuilder = mSCameraDevice.createCaptureRequest(SCameraDevice.TEMPLATE_STILL_CAPTURE);
+            mPhotoCaptureBuilder.set(SCaptureRequest.CONTROL_AF_MODE, SCaptureRequest.CONTROL_AF_MODE_CONTINUOUS_PICTURE);
+            mPhotoCaptureBuilder.addTarget(mImageReader.getSurface());
+
+
+            // Enable Phase AF, if device supports it.
+            if (mCharacteristics.getKeys().contains(SCameraCharacteristics.PHASE_AF_INFO_AVAILABLE) &&
+                    mCharacteristics.get(SCameraCharacteristics.PHASE_AF_INFO_AVAILABLE)) {
+                mPreviewBuilder.set(SCaptureRequest.PHASE_AF_MODE, SCaptureRequest.PHASE_AF_MODE_ON);
+                mPhotoCaptureBuilder.set(SCaptureRequest.PHASE_AF_MODE, SCaptureRequest.PHASE_AF_MODE_ON);
+            }
 
             List<SCaptureRequest.Key<?>> listOfAvailableCharacteristics = mCharacteristics.getAvailableCaptureRequestKeys();
             Log.d(Constants.LOG_TAG_DEBUG, "CameraHelper.createPreviewSession(): Camera characteristics before settings: " +
                     logCameraCharacteristics(listOfAvailableCharacteristics));
 
 
-            // {@link com.samsung.android.sdk.camera.processor.SCameraEffectProcessor} supports only 24fps.
-            mPreviewBuilder.set(SCaptureRequest.CONTROL_AE_TARGET_FPS_RANGE, mVideoParameter.getFpsRange());
-            mPreviewBuilder.set(SCaptureRequest.CONTROL_AF_MODE, SCaptureRequest.CONTROL_AF_MODE_CONTINUOUS_PICTURE);
-
-            //video stabilization
-            setVideoStabilization(mCameraExternalSettings != null && mCameraExternalSettings.isVideoStabilisationEnabled());
-
-
-            mPreviewBuilder.addTarget(previewSurface);
-            mPreviewBuilder.addTarget(recorderSurface);
-
             // limit preview fps up to 30.
-            int requestListSize = mVideoParameter.mFpsRange.getUpper() > 30 ? mVideoParameter.mFpsRange.getUpper() / 30 : 1;
+           /* int requestListSize = mVideoParameter.mFpsRange.getUpper() > 30 ? mVideoParameter.mFpsRange.getUpper() / 30 : 1;
 
             mRepeatingList = new ArrayList<>();
             mRepeatingList.add(mPreviewBuilder.build());
@@ -435,14 +489,16 @@ class CameraHelper implements ICameraHelper {
             for (int i = 0; i < requestListSize - 1; i++) {
                 mRepeatingList.add(mPreviewBuilder.build());
             }
-
+*/
             Log.d(Constants.LOG_TAG_DEBUG, "CameraHelper.createPreviewSession(): Camera characteristics after settings: " +
                     logCameraCharacteristics(listOfAvailableCharacteristics));
 
-            Log.d(Constants.LOG_TAG_DEBUG, "CameraHelper.createPreviewSession(): Request size: " + mRepeatingList.size());
-
             // Creates a SCameraCaptureSession here.
-            List<Surface> outputSurface = Arrays.asList(previewSurface, recorderSurface);
+            List<Surface> outputSurface = Arrays.asList(
+                    previewSurface,
+                    recorderSurface,
+                    mImageReader.getSurface()
+            );
             mSCameraDevice.createCaptureSession(outputSurface, new SCameraCaptureSession.StateCallback() {
                 @Override
                 public void onConfigureFailed(SCameraCaptureSession sCameraCaptureSession) {
@@ -489,6 +545,7 @@ class CameraHelper implements ICameraHelper {
             mMediaRecorder.setVideoFrameRate(mVideoParameter.getFpsRange().getUpper());
             mMediaRecorder.setVideoSize(mVideoParameter.getVideoSize().getWidth(), mVideoParameter.getVideoSize().getHeight());
             mMediaRecorder.setVideoEncoder(MediaRecorder.VideoEncoder.H264);
+            //mMediaRecorder.setAudioEncoder(MediaRecorder.AudioEncoder.AAC);
             mMediaRecorder.setOrientationHint(getJpegOrientation());
             mMediaRecorder.prepare();
         } catch (IOException e) {
@@ -502,7 +559,9 @@ class CameraHelper implements ICameraHelper {
     private void startPreview() throws RuntimeException {
         try {
             // Starts displaying the preview.
-            mSCameraSession.setRepeatingBurst(mRepeatingList, mSessionCaptureCallback, mBackgroundHandler);
+            mSCameraSession.setRepeatingRequest(mPreviewBuilder.build(),
+                    mSessionCaptureCallback,
+                    mBackgroundHandler);
             setCameraState(CAMERA_STATE_PREVIEW);
         } catch (CameraAccessException e) {
             throw new RuntimeException("Fail to start preview. Error: " + e.getLocalizedMessage());
@@ -681,6 +740,51 @@ class CameraHelper implements ICameraHelper {
         String timeStamp = new SimpleDateFormat("yyyyMMdd_HHmmssSSS", Locale.getDefault()).format(new Date());
         //return File.createTempFile(, mVideoFilesDir);
         return new File(mVideoFilesDir + File.separator + "temp_video_" + timeStamp + ".mp4");
+    }
+
+    /**
+     * Get path for Photo file
+     *
+     * @return String File Name
+     */
+    private File createNewPhotoFile() throws RuntimeException {
+        if (!mPhotoFilesDir.exists()) mPhotoFilesDir.mkdirs();
+        String timeStamp = new SimpleDateFormat("yyyyMMdd_HHmmssSSS", Locale.getDefault()).format(new Date());
+        //return File.createTempFile(, mVideoFilesDir);
+        return new File(mPhotoFilesDir + File.separator + "temp_photo_" + timeStamp + ".jpeg");
+    }
+
+    /**
+     * Save image to file.
+     */
+    private class ImageSaver {
+        void save(final Image image, File imageFile) {
+
+            mBackgroundHandler.post(() -> {
+                ByteBuffer buffer = image.getPlanes()[0].getBuffer();
+                byte[] bytes = new byte[buffer.remaining()];
+                buffer.get(bytes);
+                FileOutputStream output = null;
+                try {
+                    output = new FileOutputStream(imageFile);
+                    output.write(bytes);
+                } catch (IOException e) {
+                    Log.e(Constants.LOG_TAG_ERROR, "ImageSaver.save: " + e.getLocalizedMessage(), e);
+                } finally {
+                    // after using the image object, should be called the close().
+                    image.close();
+                    if (null != output) {
+                        try {
+                            output.close();
+                        } catch (IOException e) {
+                            e.printStackTrace();
+                        }
+                    }
+                }
+
+                // TODO: 22.05.18 casllback to UI after image has been saved
+            });
+        }
     }
 
 

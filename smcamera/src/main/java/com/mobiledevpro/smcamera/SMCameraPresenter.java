@@ -108,6 +108,11 @@ public class SMCameraPresenter implements ISMCamera.Presenter {
     }
 
     @Override
+    public void onPhotoCaptureButtonClick() {
+        mCameraHelper.takePicture();
+    }
+
+    @Override
     public void onAspectRatioButtonClick() {
         mIsAspectRationFull = !mIsAspectRationFull;
         mCameraPreview.setAspectRatio(mIsAspectRationFull ? 16 : 4, mIsAspectRationFull ? 9 : 3);

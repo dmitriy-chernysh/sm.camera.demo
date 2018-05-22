@@ -32,4 +32,9 @@ public interface ICameraHelper {
      * Start or stop video recording
      */
     void startStopVideoRecording();
+
+    /**
+     * Take photo picture
+     */
+    void takePicture();
 }

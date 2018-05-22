@@ -43,6 +43,8 @@ public interface ISMCamera {
 
         void onVideoRecordButtonClick();
 
+        void onPhotoCaptureButtonClick();
+
         void onAspectRatioButtonClick();
     }
 }
