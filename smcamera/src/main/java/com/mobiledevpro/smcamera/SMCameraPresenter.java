@@ -5,6 +5,7 @@ import android.graphics.SurfaceTexture;
 import android.support.annotation.NonNull;
 import android.support.v4.app.Fragment;
 import android.support.v7.app.AlertDialog;
+import android.widget.Toast;
 
 import com.mobiledevpro.commons.helpers.BasePermissionsHelper;
 
@@ -21,7 +22,9 @@ import java.io.File;
  * #MobileDevPro
  */
 
-public class SMCameraPresenter implements ISMCamera.Presenter {
+public class SMCameraPresenter implements ISMCamera.Presenter,
+        ICameraHelper.IVideoCaptureCallbacks,
+        ICameraHelper.IPhotoCaptureCallbacks {
     private static final int CODE_REQUEST_PERMISSION_CAMERA = 10001;
 
     private ISMCamera.View mView;
@@ -50,8 +53,9 @@ public class SMCameraPresenter implements ISMCamera.Presenter {
                 mView.getActivity(),
                 videoFilesDir,
                 photoFilesDir,
-                cameraSettings
-
+                cameraSettings,
+                this,
+                this
         );
 
         //check if it's a Samsung device
@@ -117,6 +121,18 @@ public class SMCameraPresenter implements ISMCamera.Presenter {
         mIsAspectRationFull = !mIsAspectRationFull;
         mCameraPreview.setAspectRatio(mIsAspectRationFull ? 16 : 4, mIsAspectRationFull ? 9 : 3);
         mView.setFullAspectRatio(mIsAspectRationFull);
+    }
+
+    @Override
+    public void onVideoCaptureFinished(File outputVideoFile) {
+        if (outputVideoFile == null) return;
+        Toast.makeText(mView.getActivity(), outputVideoFile.getAbsolutePath(), Toast.LENGTH_SHORT).show();
+    }
+
+    @Override
+    public void onPhotoCaptureFinished(File outputPhotoFile) {
+        if (outputPhotoFile == null) return;
+        Toast.makeText(mView.getActivity(), outputPhotoFile.getAbsolutePath(), Toast.LENGTH_SHORT).show();
     }
 
     private void startCameraPreview() {

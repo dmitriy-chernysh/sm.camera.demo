@@ -94,6 +94,9 @@ class CameraHelper implements ICameraHelper {
     private File mPhotoFilesDir;
 
     private CameraSettings mCameraExternalSettings;
+    private IVideoCaptureCallbacks mVideoCaptureCallbacks;
+    private IPhotoCaptureCallbacks mPhotoCaptureCallbacks;
+    private File mRecordedVideoFile;
 
     private SCameraCaptureSession.CaptureCallback mSessionCaptureCallback = new SCameraCaptureSession.CaptureCallback() {
         @Override
@@ -107,9 +110,6 @@ class CameraHelper implements ICameraHelper {
                 case CAMERA_STATE_PREVIEW:
                 case CAMERA_STATE_CLOSING:
                     // do nothing
-                    break;
-                case CAMERA_STATE_RECORD_VIDEO:
-                    Log.d(Constants.LOG_TAG_DEBUG, "CameraHelper.onCaptureCompleted(): result: " + result.toString());
                     break;
             }
         }
@@ -125,10 +125,14 @@ class CameraHelper implements ICameraHelper {
     private CameraHelper(@NonNull Context context,
                          @NonNull File videoFilesDir,
                          @NonNull File photoFilesDir,
-                         @NonNull CameraSettings cameraSettings) {
+                         @NonNull CameraSettings cameraSettings,
+                         IVideoCaptureCallbacks videoCaptureCallbacks,
+                         IPhotoCaptureCallbacks photoCaptureCallbacks) {
         mVideoFilesDir = videoFilesDir;
         mPhotoFilesDir = photoFilesDir;
         mCameraExternalSettings = cameraSettings;
+        mVideoCaptureCallbacks = videoCaptureCallbacks;
+        mPhotoCaptureCallbacks = photoCaptureCallbacks;
 
         Log.d(Constants.LOG_TAG_DEBUG, "CameraHelper.CameraHelper(): Video files dir: " + mVideoFilesDir);
         Log.d(Constants.LOG_TAG_DEBUG, "CameraHelper.CameraHelper(): Photo files dir: " + photoFilesDir);
@@ -138,9 +142,16 @@ class CameraHelper implements ICameraHelper {
     public static CameraHelper init(@NonNull Context context,
                                     @NonNull File videoFilesDir,
                                     @NonNull File photoFilesDir,
-                                    @NonNull CameraSettings cameraSettings) {
+                                    @NonNull CameraSettings cameraSettings,
+                                    IVideoCaptureCallbacks videoCaptureCallbacks,
+                                    IPhotoCaptureCallbacks photoCaptureCallbacks) {
         if (sHelper == null)
-            sHelper = new CameraHelper(context, videoFilesDir, photoFilesDir, cameraSettings);
+            sHelper = new CameraHelper(context,
+                    videoFilesDir,
+                    photoFilesDir,
+                    cameraSettings,
+                    videoCaptureCallbacks,
+                    photoCaptureCallbacks);
         return sHelper;
     }
 
@@ -191,6 +202,8 @@ class CameraHelper implements ICameraHelper {
             //stop video recording
             mMediaRecorder.stop();
             mMediaRecorder.reset();
+            if (mVideoCaptureCallbacks != null)
+                mVideoCaptureCallbacks.onVideoCaptureFinished(mRecordedVideoFile);
             Log.d(Constants.LOG_TAG_DEBUG, "CameraHelper.startStopVideoRecording(): STOP RECORD");
 
             mBackgroundHandler.post(() -> {
@@ -393,6 +406,7 @@ class CameraHelper implements ICameraHelper {
             }
 
             if (null != mMediaRecorder) {
+                mMediaRecorder.reset();
                 mMediaRecorder.release();
                 mMediaRecorder = null;
             }
@@ -525,10 +539,11 @@ class CameraHelper implements ICameraHelper {
      */
     private void prepareMediaRecorder() throws RuntimeException {
         try {
+            mRecordedVideoFile = createNewVideoFile();
             mMediaRecorder = new MediaRecorder();
             mMediaRecorder.setVideoSource(MediaRecorder.VideoSource.SURFACE);
             mMediaRecorder.setOutputFormat(MediaRecorder.OutputFormat.MPEG_4);
-            mMediaRecorder.setOutputFile(createNewVideoFile().getAbsolutePath());
+            mMediaRecorder.setOutputFile(mRecordedVideoFile.getAbsolutePath());
 
             int bitrate = 384000;
             if (mVideoParameter.getVideoSize().getWidth() * mVideoParameter.getVideoSize().getHeight() >= 1920 * 1080) {
@@ -768,8 +783,10 @@ class CameraHelper implements ICameraHelper {
                 try {
                     output = new FileOutputStream(imageFile);
                     output.write(bytes);
+                    if (mPhotoCaptureCallbacks != null)
+                        mPhotoCaptureCallbacks.onPhotoCaptureFinished(imageFile);
                 } catch (IOException e) {
-                    Log.e(Constants.LOG_TAG_ERROR, "ImageSaver.save: " + e.getLocalizedMessage(), e);
+                    throw new RuntimeException("Cannot save photo picture. Error: " + e.getLocalizedMessage());
                 } finally {
                     // after using the image object, should be called the close().
                     image.close();
@@ -777,7 +794,7 @@ class CameraHelper implements ICameraHelper {
                         try {
                             output.close();
                         } catch (IOException e) {
-                            e.printStackTrace();
+                            //do nothing
                         }
                     }
                 }

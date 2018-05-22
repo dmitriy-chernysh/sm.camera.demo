@@ -3,6 +3,8 @@ package com.mobiledevpro.smcamera;
 import android.content.Context;
 import android.view.TextureView;
 
+import java.io.File;
+
 /**
  * Interface for camera helper
  * <p>
@@ -13,6 +15,14 @@ import android.view.TextureView;
  * #MobileDevPro
  */
 public interface ICameraHelper {
+
+    interface IVideoCaptureCallbacks {
+        void onVideoCaptureFinished(File outputVideoFile);
+    }
+
+    interface IPhotoCaptureCallbacks {
+        void onPhotoCaptureFinished(File outputPhotoFile);
+    }
 
     /**
      * Check if it's a Samsung device
