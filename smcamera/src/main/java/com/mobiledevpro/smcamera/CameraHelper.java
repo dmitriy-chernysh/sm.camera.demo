@@ -83,6 +83,9 @@ class CameraHelper implements ICameraHelper {
 
     private MediaRecorder mMediaRecorder;
     private File mVideoFilesDir;
+    private File mPhotoFilesDir;
+
+    private CameraSettings mCameraExternalSettings;
 
     private SCameraCaptureSession.CaptureCallback mSessionCaptureCallback = new SCameraCaptureSession.CaptureCallback() {
         @Override
@@ -97,28 +100,39 @@ class CameraHelper implements ICameraHelper {
                 case CAMERA_STATE_CLOSING:
                     // do nothing
                     break;
+                case CAMERA_STATE_RECORD_VIDEO:
+                    Log.d(Constants.LOG_TAG_DEBUG, "CameraHelper.onCaptureCompleted(): result: " + result.toString());
+                    break;
             }
         }
     };
 
-    private CameraHelper(@NonNull Context context, @NonNull File videoFilesDir) {
+    private CameraHelper(@NonNull Context context,
+                         @NonNull File videoFilesDir,
+                         @NonNull File photoFilesDir,
+                         @NonNull CameraSettings cameraSettings) {
         mVideoFilesDir = videoFilesDir;
+        mPhotoFilesDir = photoFilesDir;
+        mCameraExternalSettings = cameraSettings;
+
         Log.d(Constants.LOG_TAG_DEBUG, "CameraHelper.CameraHelper(): Video files dir: " + mVideoFilesDir);
+        Log.d(Constants.LOG_TAG_DEBUG, "CameraHelper.CameraHelper(): Photo files dir: " + photoFilesDir);
         initSCamera(context);
     }
 
-    public static CameraHelper init(@NonNull Context context, @NonNull File videoFilesDir) {
-        if (sHelper == null) sHelper = new CameraHelper(context, videoFilesDir);
+    public static CameraHelper init(@NonNull Context context,
+                                    @NonNull File videoFilesDir,
+                                    @NonNull File photoFilesDir,
+                                    @NonNull CameraSettings cameraSettings) {
+        if (sHelper == null)
+            sHelper = new CameraHelper(context, videoFilesDir, photoFilesDir, cameraSettings);
         return sHelper;
     }
 
     @Override
     public boolean isThisSamsungDevice() {
-        if (mSCamera.isFeatureEnabled(SCamera.SCAMERA_PROCESSOR)) {
-            return true;
-        }
+        return mSCamera.isFeatureEnabled(SCamera.SCAMERA_PROCESSOR);
 
-        return false;
     }
 
     @Override
@@ -389,17 +403,6 @@ class CameraHelper implements ICameraHelper {
 
             Log.d(Constants.LOG_TAG_DEBUG, "CameraHelper.createPreviewSession(): Preview size: " + mPreviewSize + " Video size: " + mVideoParameter.getVideoSize());
 
-            // Set the aspect ratio to TextureView
-        /*    int orientation = getResources().getConfiguration().orientation;
-            if (orientation == Configuration.ORIENTATION_LANDSCAPE) {
-                mTextureView.setAspectRatio(
-                        mPreviewSize.getWidth(), mPreviewSize.getHeight());
-            } else {
-                mTextureView.setAspectRatio(
-                        mPreviewSize.getHeight(), mPreviewSize.getWidth());
-            }
-            */
-
             SurfaceTexture texture = mTextureView.getSurfaceTexture();
             Surface previewSurface = new Surface(texture);
             Surface recorderSurface = mMediaRecorder.getSurface();
@@ -407,10 +410,19 @@ class CameraHelper implements ICameraHelper {
             // Creates SCaptureRequest.Builder for preview and recording with output target.
             mPreviewBuilder = mSCameraDevice.createCaptureRequest(SCameraDevice.TEMPLATE_RECORD);
 
+            List<SCaptureRequest.Key<?>> listOfAvailableCharacteristics = mCharacteristics.getAvailableCaptureRequestKeys();
+            Log.d(Constants.LOG_TAG_DEBUG, "CameraHelper.createPreviewSession(): Camera characteristics before settings: " +
+                    logCameraCharacteristics(listOfAvailableCharacteristics));
+
+
             // {@link com.samsung.android.sdk.camera.processor.SCameraEffectProcessor} supports only 24fps.
             mPreviewBuilder.set(SCaptureRequest.CONTROL_AE_TARGET_FPS_RANGE, mVideoParameter.getFpsRange());
-            mPreviewBuilder.set(SCaptureRequest.CONTROL_AF_MODE, SCaptureRequest.CONTROL_AF_MODE_CONTINUOUS_VIDEO);
-            //mPreviewBuilder.set(SCaptureRequest.CONTROL_SCENE_MODE, SCaptureRequest.CONTROL_SCENE_MODE_HIGH_SPEED_VIDEO);
+            mPreviewBuilder.set(SCaptureRequest.CONTROL_AF_MODE, SCaptureRequest.CONTROL_AF_MODE_CONTINUOUS_PICTURE);
+
+            //video stabilization
+            setVideoStabilization(mCameraExternalSettings != null && mCameraExternalSettings.isVideoStabilisationEnabled());
+
+
             mPreviewBuilder.addTarget(previewSurface);
             mPreviewBuilder.addTarget(recorderSurface);
 
@@ -423,6 +435,9 @@ class CameraHelper implements ICameraHelper {
             for (int i = 0; i < requestListSize - 1; i++) {
                 mRepeatingList.add(mPreviewBuilder.build());
             }
+
+            Log.d(Constants.LOG_TAG_DEBUG, "CameraHelper.createPreviewSession(): Camera characteristics after settings: " +
+                    logCameraCharacteristics(listOfAvailableCharacteristics));
 
             Log.d(Constants.LOG_TAG_DEBUG, "CameraHelper.createPreviewSession(): Request size: " + mRepeatingList.size());
 
@@ -551,9 +566,87 @@ class CameraHelper implements ICameraHelper {
     }
 
     /**
+     * Set video stabilization for Capture request
+     *
+     * @param isOn Stabilization must be turned on
+     */
+    private void setVideoStabilization(boolean isOn) {
+
+        //Set OIS for SAMSUNG DEVICES
+        if (mCharacteristics.getKeys().contains(SCameraCharacteristics.LENS_INFO_AVAILABLE_OPTICAL_STABILIZATION_OPERATION_MODE)) {
+            for (int oisMode : mCharacteristics.get(SCameraCharacteristics.LENS_INFO_AVAILABLE_OPTICAL_STABILIZATION_OPERATION_MODE)) {
+                switch (oisMode) {
+                    case SCameraCharacteristics.LENS_OPTICAL_STABILIZATION_OPERATION_MODE_VIDEO:
+                        Log.d(Constants.LOG_TAG_DEBUG, "CameraHelper.createPreviewSession(): ois mode: video");
+                        mPreviewBuilder.set(SCaptureRequest.LENS_OPTICAL_STABILIZATION_OPERATION_MODE, SCaptureRequest.LENS_OPTICAL_STABILIZATION_OPERATION_MODE_VIDEO);
+                        mPreviewBuilder.set(
+                                SCaptureRequest.LENS_OPTICAL_STABILIZATION_MODE,
+                                isOn ? SCaptureRequest.LENS_OPTICAL_STABILIZATION_MODE_ON : SCaptureRequest.LENS_OPTICAL_STABILIZATION_MODE_OFF
+                        );
+                        return;
+                }
+
+            }
+        }
+
+        //set OIS for NON-SAMSUNG DEVICES and for devices which are support OIS
+        if (mCharacteristics.getKeys().contains(SCameraCharacteristics.LENS_INFO_AVAILABLE_OPTICAL_STABILIZATION)) {
+            for (int ois : mCharacteristics.get(SCameraCharacteristics.LENS_INFO_AVAILABLE_OPTICAL_STABILIZATION)) {
+                switch (ois) {
+                    case SCameraCharacteristics.LENS_OPTICAL_STABILIZATION_MODE_ON:
+                        //turn off
+                        if (!isOn) mPreviewBuilder.set(
+                                SCaptureRequest.LENS_OPTICAL_STABILIZATION_MODE,
+                                SCaptureRequest.LENS_OPTICAL_STABILIZATION_MODE_OFF);
+                        return;
+                    case SCameraCharacteristics.LENS_OPTICAL_STABILIZATION_MODE_OFF:
+                        //turn on
+                        if (isOn) mPreviewBuilder.set(
+                                SCaptureRequest.LENS_OPTICAL_STABILIZATION_MODE,
+                                SCaptureRequest.LENS_OPTICAL_STABILIZATION_MODE_ON);
+                        return;
+                }
+            }
+        }
+
+        //set software video stabilization for non-Samsung devices or for devices which are not supported OIS
+        if (mCharacteristics.getKeys().contains(SCameraCharacteristics.CONTROL_AVAILABLE_VIDEO_STABILIZATION_MODES)) {
+            for (int mode : mCharacteristics.get(SCameraCharacteristics.CONTROL_AVAILABLE_VIDEO_STABILIZATION_MODES)) {
+                switch (mode) {
+                    case SCameraCharacteristics.CONTROL_VIDEO_STABILIZATION_MODE_ON:
+                        //turn off
+                        if (!isOn) mPreviewBuilder.set(
+                                SCaptureRequest.CONTROL_VIDEO_STABILIZATION_MODE,
+                                SCaptureRequest.LENS_OPTICAL_STABILIZATION_MODE_OFF);
+                        return;
+                    case SCameraCharacteristics.CONTROL_VIDEO_STABILIZATION_MODE_OFF:
+                        //turn on
+                        if (isOn) mPreviewBuilder.set(
+                                SCaptureRequest.CONTROL_VIDEO_STABILIZATION_MODE,
+                                SCaptureRequest.LENS_OPTICAL_STABILIZATION_MODE_ON);
+                        return;
+                }
+            }
+        }
+
+    }
+
+    private String logCameraCharacteristics(List<SCaptureRequest.Key<?>> keyList) {
+        StringBuilder logString = new StringBuilder();
+        for (SCaptureRequest.Key<?> key : keyList) {
+            logString.append("\n");
+            logString.append(key.getName());
+            logString.append(" = ");
+            logString.append(mPreviewBuilder.get(key));
+        }
+        return logString.toString();
+    }
+
+    /**
      * Shows alert dialog.
      */
-    private void showAlertDialog(final Context context, String message, final boolean finishActivity) {
+    private void showAlertDialog(final Context context, String message,
+                                 final boolean finishActivity) {
         final AlertDialog.Builder dialog = new AlertDialog.Builder(context, R.style.CommonAppTheme_AlertDialog);
         dialog.setMessage(message)
                 .setTitle(R.string.dialog_title_error)

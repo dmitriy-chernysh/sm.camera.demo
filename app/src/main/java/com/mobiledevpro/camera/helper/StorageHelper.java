@@ -58,4 +58,16 @@ public class StorageHelper {
         if (!file.exists()) file.mkdirs();
         return file;
     }
+
+
+    /**
+     * Get path for photo files
+     *
+     * @return File path
+     */
+    public File getPhotoFilesDir() {
+        File file = new File(mAppFolder + File.separator + VIDEO_FOLDER_NAME);
+        if (!file.exists()) file.mkdirs();
+        return file;
+    }
 }

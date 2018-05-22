@@ -26,8 +26,6 @@ public class SMCameraPresenter implements ISMCamera.Presenter {
 
     private ISMCamera.View mView;
 
-    //private Camera mCamera;
-    //private SurfaceTexture mSurfaceTexture;
     private AutoFitTextureView mCameraPreview;
     private int mTextureWidth, mTextureHeight;
 
@@ -37,7 +35,10 @@ public class SMCameraPresenter implements ISMCamera.Presenter {
 
 
     @Override
-    public void bindView(ISMCamera.View view, @NonNull File videoFilesDir) {
+    public void bindView(ISMCamera.View view,
+                         @NonNull File videoFilesDir,
+                         @NonNull File photoFilesDir,
+                         @NonNull CameraSettings cameraSettings) {
         mView = view;
 
         mCameraPreview = mView.getCameraPreview();
@@ -45,7 +46,13 @@ public class SMCameraPresenter implements ISMCamera.Presenter {
         mCameraPreview.setAspectRatio(16, 9);
         mView.setFullAspectRatio(mIsAspectRationFull);
 
-        mCameraHelper = CameraHelper.init(mView.getActivity(), videoFilesDir);
+        mCameraHelper = CameraHelper.init(
+                mView.getActivity(),
+                videoFilesDir,
+                photoFilesDir,
+                cameraSettings
+
+        );
 
         //check if it's a Samsung device
         if (!mCameraHelper.isThisSamsungDevice()) {

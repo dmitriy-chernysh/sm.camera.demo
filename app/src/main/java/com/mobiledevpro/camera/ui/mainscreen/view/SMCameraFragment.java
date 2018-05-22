@@ -17,6 +17,7 @@ import com.mobiledevpro.camera.helper.Constants;
 import com.mobiledevpro.camera.helper.StorageHelper;
 import com.mobiledevpro.commons.fragment.BaseFragment;
 import com.mobiledevpro.smcamera.AutoFitTextureView;
+import com.mobiledevpro.smcamera.CameraSettings;
 import com.mobiledevpro.smcamera.ISMCamera;
 import com.mobiledevpro.smcamera.SMCameraPresenter;
 
@@ -98,7 +99,9 @@ public class SMCameraFragment extends BaseFragment implements ISMCamera.View, Te
         super.onStart();
         mPresenter.bindView(
                 this,
-                StorageHelper.get(App.getAppContext()).getVideoFilesDir()
+                StorageHelper.get(App.getAppContext()).getVideoFilesDir(),
+                StorageHelper.get(App.getAppContext()).getPhotoFilesDir(),
+                new CameraSettings().setVideoStabilisationEnabled(true)
         );
     }
 

@@ -30,7 +30,10 @@ public interface ISMCamera {
 
     interface Presenter {
 
-        void bindView(ISMCamera.View view, @NonNull File videoFilesDir);
+        void bindView(ISMCamera.View view,
+                      @NonNull File videoFilesDir,
+                      @NonNull File photoFilesDir,
+                      @NonNull CameraSettings cameraSettings);
 
         void unbindView();
 
