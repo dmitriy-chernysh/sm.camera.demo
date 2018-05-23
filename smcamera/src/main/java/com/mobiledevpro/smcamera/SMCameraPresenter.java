@@ -4,7 +4,8 @@ import android.content.pm.PackageManager;
 import android.graphics.SurfaceTexture;
 import android.support.annotation.NonNull;
 import android.support.v4.app.Fragment;
-import android.support.v7.app.AlertDialog;
+import android.view.Window;
+import android.view.WindowManager;
 import android.widget.Toast;
 
 import com.mobiledevpro.commons.helpers.BasePermissionsHelper;
@@ -59,7 +60,7 @@ public class SMCameraPresenter implements ISMCamera.Presenter,
         );
 
         //check if it's a Samsung device
-        if (!mCameraHelper.isThisSamsungDevice()) {
+        /*if (!mCameraHelper.isThisSamsungDevice()) {
             new AlertDialog.Builder(mView.getActivity(), R.style.CommonAppTheme_AlertDialog)
                     .setTitle(R.string.dialog_title_error)
                     .setMessage("This is not a Samsung camera")
@@ -69,6 +70,14 @@ public class SMCameraPresenter implements ISMCamera.Presenter,
                     .create()
                     .show();
 
+        }*/
+
+        //set screen brightness to max
+        Window window = mView.getActivity().getWindow();
+        if (window != null) {
+            WindowManager.LayoutParams lp = window.getAttributes();
+            lp.screenBrightness = 1; //from dark (0) to full bright (1)
+            window.setAttributes(lp);
         }
 
     }
