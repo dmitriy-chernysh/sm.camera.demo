@@ -10,6 +10,7 @@ import android.view.TextureView;
 import android.view.View;
 import android.view.WindowManager;
 import android.widget.ImageButton;
+import android.widget.TextView;
 
 import com.mobiledevpro.camera.App;
 import com.mobiledevpro.camera.R;
@@ -50,6 +51,12 @@ public class SMCameraFragment extends BaseFragment implements ISMCamera.View, Te
 
     @BindView(R.id.btn_aspect)
     ImageButton mBtnAspectRation;
+
+    @BindView(R.id.tv_camera_loading)
+    TextView mTvCameraLoading;
+
+    @BindView(R.id.layout_capture_buttons)
+    View mLayoutCaptureButtons;
 
     private ISMCamera.Presenter mPresenter;
     private Unbinder mButterKnife;
@@ -107,6 +114,7 @@ public class SMCameraFragment extends BaseFragment implements ISMCamera.View, Te
                 new CameraSettings()
                         .setVideoStabilisationEnabled(true)
                         .setAudioEnabled(true)
+                        .setRotation(getActivity().getWindow().getWindowManager().getDefaultDisplay().getRotation())
         );
     }
 
@@ -136,7 +144,7 @@ public class SMCameraFragment extends BaseFragment implements ISMCamera.View, Te
     @Override
     public void onSurfaceTextureSizeChanged(SurfaceTexture surfaceTexture, int i, int i1) {
         Log.d(Constants.LOG_TAG_DEBUG, "SMCameraFragment.onSurfaceTextureSizeChanged(): ");
-        //do nothing
+        mPresenter.onCameraViewSizeChanged(surfaceTexture, i, i1);
     }
 
     @Override
@@ -164,6 +172,13 @@ public class SMCameraFragment extends BaseFragment implements ISMCamera.View, Te
     @Override
     public void setFullAspectRatio(boolean b) {
         mBtnAspectRation.setActivated(b);
+    }
+
+    @Override
+    public void setIsCameraLoading(boolean isLoading) {
+        mTvCameraLoading.setVisibility(isLoading ? View.VISIBLE : View.GONE);
+        mLayoutCaptureButtons.setVisibility(isLoading ? View.INVISIBLE : View.VISIBLE);
+        //  mCameraPreview.setVisibility(isLoading ? View.INVISIBLE : View.VISIBLE);
     }
 
     @OnClick(R.id.btn_record_start_stop)

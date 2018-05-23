@@ -26,6 +26,8 @@ public interface ISMCamera {
         void setRecordingState(boolean isRecording);
 
         void setFullAspectRatio(boolean b);
+
+        void setIsCameraLoading(boolean isLoading);
     }
 
     interface Presenter {
@@ -38,6 +40,8 @@ public interface ISMCamera {
         void unbindView();
 
         void onCameraViewAvailable(SurfaceTexture surfaceTexture, int width, int height);
+
+        void onCameraViewSizeChanged(SurfaceTexture surfaceTexture, int width, int height);
 
         void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults);
 

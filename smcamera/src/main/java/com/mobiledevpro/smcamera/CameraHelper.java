@@ -96,6 +96,7 @@ class CameraHelper implements ICameraHelper {
     private CameraSettings mCameraExternalSettings;
     private IVideoCaptureCallbacks mVideoCaptureCallbacks;
     private IPhotoCaptureCallbacks mPhotoCaptureCallbacks;
+    private IOpenCameraCallbacks mOpenCameraCallbacks;
     private File mRecordedVideoFile;
 
     private SCameraCaptureSession.CaptureCallback mSessionCaptureCallback = new SCameraCaptureSession.CaptureCallback() {
@@ -125,14 +126,14 @@ class CameraHelper implements ICameraHelper {
     private CameraHelper(@NonNull Context context,
                          @NonNull File videoFilesDir,
                          @NonNull File photoFilesDir,
-                         @NonNull CameraSettings cameraSettings,
                          IVideoCaptureCallbacks videoCaptureCallbacks,
-                         IPhotoCaptureCallbacks photoCaptureCallbacks) {
+                         IPhotoCaptureCallbacks photoCaptureCallbacks,
+                         IOpenCameraCallbacks openCameraCallbacks) {
         mVideoFilesDir = videoFilesDir;
         mPhotoFilesDir = photoFilesDir;
-        mCameraExternalSettings = cameraSettings;
         mVideoCaptureCallbacks = videoCaptureCallbacks;
         mPhotoCaptureCallbacks = photoCaptureCallbacks;
+        mOpenCameraCallbacks = openCameraCallbacks;
 
         Log.d(Constants.LOG_TAG_DEBUG, "CameraHelper.CameraHelper(): Video files dir: " + mVideoFilesDir);
         Log.d(Constants.LOG_TAG_DEBUG, "CameraHelper.CameraHelper(): Photo files dir: " + photoFilesDir);
@@ -142,16 +143,16 @@ class CameraHelper implements ICameraHelper {
     public static CameraHelper init(@NonNull Context context,
                                     @NonNull File videoFilesDir,
                                     @NonNull File photoFilesDir,
-                                    @NonNull CameraSettings cameraSettings,
                                     IVideoCaptureCallbacks videoCaptureCallbacks,
-                                    IPhotoCaptureCallbacks photoCaptureCallbacks) {
+                                    IPhotoCaptureCallbacks photoCaptureCallbacks,
+                                    IOpenCameraCallbacks openCameraCallbacks) {
         if (sHelper == null)
             sHelper = new CameraHelper(context,
                     videoFilesDir,
                     photoFilesDir,
-                    cameraSettings,
                     videoCaptureCallbacks,
-                    photoCaptureCallbacks);
+                    photoCaptureCallbacks,
+                    openCameraCallbacks);
         return sHelper;
     }
 
@@ -162,18 +163,24 @@ class CameraHelper implements ICameraHelper {
     }
 
     @Override
-    public void startCamera(Context context,
-                            boolean useBackCamera,
-                            TextureView textureView,
-                            int textureWidth,
-                            int textureHeight,
-                            int rotation) {
+    public synchronized void startCamera(Context context,
+                                         TextureView textureView,
+                                         int textureWidth,
+                                         int textureHeight,
+                                         @NonNull CameraSettings cameraSettings) {
         mTextureView = textureView;
-        Log.d(Constants.LOG_TAG_DEBUG, "CameraHelper.startCamera(): Texture W " + mTextureView.getWidth() + " H " + mTextureView.getHeight());
+        mCameraExternalSettings = cameraSettings;
+
+        Log.d(Constants.LOG_TAG_DEBUG, "CameraHelper.startCamera(): \n" +
+                "Texture: W " + mTextureView.getWidth() + " H " + mTextureView.getHeight() + "\n" +
+                "Rotation: " + mCameraExternalSettings.getRotation() + "\n" +
+                "Aspect Ratio: " + String.valueOf(mCameraExternalSettings.getAspectRatio()) + "\n"
+        );
+
         startBackgroundThread(context);
         try {
-            configureCameraParameters(useBackCamera);
-            configureTextureViewTransform(textureWidth, textureHeight, rotation);
+            configureCameraParameters();
+            configureTextureViewTransform(textureWidth, textureHeight);
             openCamera();
         } catch (RuntimeException e) {
             showAlertDialog(context, e.getLocalizedMessage(), true);
@@ -181,7 +188,7 @@ class CameraHelper implements ICameraHelper {
     }
 
     @Override
-    public void stopCamera(Context context) {
+    public synchronized void stopCamera(Context context) {
         stopBackgroundThread();
         try {
             closeCamera();
@@ -189,6 +196,17 @@ class CameraHelper implements ICameraHelper {
             showAlertDialog(context, e.getLocalizedMessage(), true);
         }
         mTextureView = null;
+    }
+
+    @Override
+    public void restartCamera(Context context,
+                              TextureView textureView,
+                              int textureWidth,
+                              int textureHeight,
+                              @NonNull CameraSettings cameraSettings) {
+        stopCamera(context);
+        initSCamera(context);
+        startCamera(context, textureView, textureWidth, textureHeight, cameraSettings);
     }
 
     @Override
@@ -294,14 +312,14 @@ class CameraHelper implements ICameraHelper {
         return false;
     }
 
-    private void configureCameraParameters(boolean useBackCamera) {
+    private void configureCameraParameters() {
         try {
             if (!mCameraOpenCloseLock.tryAcquire(3000, TimeUnit.MILLISECONDS)) {
                 throw new RuntimeException("Timeout (3 sec) waiting to lock camera opening.");
             }
 
             //Getting camera id
-            mCameraId = getCameraId(useBackCamera);
+            mCameraId = getCameraId(mCameraExternalSettings == null || mCameraExternalSettings.isUseBackCamera());
             if (mCameraId == null) {
                 throw new RuntimeException("Cannot get camera parameters. Error: camera id is null. Please, try again.");
             }
@@ -323,11 +341,17 @@ class CameraHelper implements ICameraHelper {
 
             // TODO: 18.05.18 need to add ability to change FPS from app settings (30 or 60)
             Range<Integer> fpsRange = new Range<>(30, 30);
-            Size videoSize = new Size(1280, 720);
+
+            Size videoSize, photoSize;
+            if (mCameraExternalSettings == null || mCameraExternalSettings.getAspectRatio() == (double) 16 / 9) {
+                videoSize = new Size(1280, 720);
+                photoSize = new Size(1280, 720);
+            } else {
+                videoSize = new Size(640, 480);
+                photoSize = new Size(640, 480);
+            }
+
             mVideoParameter = new VideoParameter(videoSize, fpsRange);
-
-            Size photoSize = new Size(1280, 720);
-
             // Configures an ImageReader
             mImageReader = ImageReader.newInstance(photoSize.getWidth(), photoSize.getHeight(), ImageFormat.JPEG, 1);
             mImageReader.setOnImageAvailableListener(mImageCallback, mBackgroundHandler);
@@ -366,7 +390,7 @@ class CameraHelper implements ICameraHelper {
                 }
 
                 public void onOpened(SCameraDevice cameraDevice) {
-                    Log.d(Constants.LOG_TAG_DEBUG, "CameraHelper.onOpened(): " + cameraDevice.toString());
+                    Log.d(Constants.LOG_TAG_DEBUG, "CameraHelper.onCameraReady(): " + cameraDevice.toString());
                     mCameraOpenCloseLock.release();
                     if (getCameraState() == CAMERA_STATE_CLOSING) return;
                     mSCameraDevice = cameraDevice;
@@ -582,6 +606,8 @@ class CameraHelper implements ICameraHelper {
                     mSessionCaptureCallback,
                     mBackgroundHandler);
             setCameraState(CAMERA_STATE_PREVIEW);
+            if (mOpenCameraCallbacks != null)
+                mOpenCameraCallbacks.onCameraReady();
         } catch (CameraAccessException e) {
             throw new RuntimeException("Fail to start preview. Error: " + e.getLocalizedMessage());
         }
@@ -616,12 +642,11 @@ class CameraHelper implements ICameraHelper {
     /**
      * Configures requires transform {@link android.graphics.Matrix} to TextureView.
      */
-    private void configureTextureViewTransform(int viewWidth, int viewHeight, int rotation) {
-
+    private void configureTextureViewTransform(int viewWidth, int viewHeight) {
         if (null == mTextureView || null == mPreviewSize) return;
+        int rotation = mCameraExternalSettings != null ? mCameraExternalSettings.getRotation() : Surface.ROTATION_90;
 
         Log.d(Constants.LOG_TAG_DEBUG, "CameraHelper.configureTextureViewTransform(): W " + viewWidth + " H " + viewHeight);
-        // int rotation = Surface.ROTATION_90;//mView.getActivity().getWindowManager().getDefaultDisplay().getRotation();
         Matrix matrix = new Matrix();
         RectF viewRect = new RectF(0, 0, viewWidth, viewHeight);
         RectF bufferRect = new RectF(0, 0, mPreviewSize.getHeight(), mPreviewSize.getWidth());

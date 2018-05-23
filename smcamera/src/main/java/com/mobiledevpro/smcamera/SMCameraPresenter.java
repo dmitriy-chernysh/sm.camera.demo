@@ -4,6 +4,7 @@ import android.content.pm.PackageManager;
 import android.graphics.SurfaceTexture;
 import android.support.annotation.NonNull;
 import android.support.v4.app.Fragment;
+import android.util.Log;
 import android.view.Window;
 import android.view.WindowManager;
 import android.widget.Toast;
@@ -25,7 +26,8 @@ import java.io.File;
 
 public class SMCameraPresenter implements ISMCamera.Presenter,
         ICameraHelper.IVideoCaptureCallbacks,
-        ICameraHelper.IPhotoCaptureCallbacks {
+        ICameraHelper.IPhotoCaptureCallbacks,
+        ICameraHelper.IOpenCameraCallbacks {
     private static final int CODE_REQUEST_PERMISSION_CAMERA = 10001;
 
     private ISMCamera.View mView;
@@ -34,9 +36,9 @@ public class SMCameraPresenter implements ISMCamera.Presenter,
     private int mTextureWidth, mTextureHeight;
 
     private boolean mIsVideoRecording;
-    private boolean mIsAspectRationFull = true;
+    private boolean mIsAspectRationFull;
     private CameraHelper mCameraHelper;
-
+    private CameraSettings mCameraSettings;
 
     @Override
     public void bindView(ISMCamera.View view,
@@ -44,33 +46,29 @@ public class SMCameraPresenter implements ISMCamera.Presenter,
                          @NonNull File photoFilesDir,
                          @NonNull CameraSettings cameraSettings) {
         mView = view;
-
+        mCameraSettings = cameraSettings;
         mCameraPreview = mView.getCameraPreview();
         //ratio by default
-        mCameraPreview.setAspectRatio(16, 9);
+
+        mView.setIsCameraLoading(true);
+
+        if (cameraSettings == null || cameraSettings.getAspectRatio() == (double) 16 / 9) {
+            mCameraPreview.setAspectRatio(16, 9);
+            mIsAspectRationFull = true;
+        } else {
+            mCameraPreview.setAspectRatio(4, 3);
+            mIsAspectRationFull = false;
+        }
         mView.setFullAspectRatio(mIsAspectRationFull);
 
         mCameraHelper = CameraHelper.init(
                 mView.getActivity(),
                 videoFilesDir,
                 photoFilesDir,
-                cameraSettings,
+                this,
                 this,
                 this
         );
-
-        //check if it's a Samsung device
-        /*if (!mCameraHelper.isThisSamsungDevice()) {
-            new AlertDialog.Builder(mView.getActivity(), R.style.CommonAppTheme_AlertDialog)
-                    .setTitle(R.string.dialog_title_error)
-                    .setMessage("This is not a Samsung camera")
-                    .setPositiveButton(R.string.button_ok, (dialogInterface, i) -> {
-                        // mView.getActivity().finish();
-                    })
-                    .create()
-                    .show();
-
-        }*/
 
         //set screen brightness to max
         Window window = mView.getActivity().getWindow();
@@ -98,6 +96,13 @@ public class SMCameraPresenter implements ISMCamera.Presenter,
         if (checkRuntimePermissions()) {
             startCameraPreview();
         }
+    }
+
+    @Override
+    public void onCameraViewSizeChanged(SurfaceTexture surfaceTexture, int width, int height) {
+        mTextureWidth = width;
+        mTextureHeight = height;
+        restartCameraPreview();
     }
 
     @Override
@@ -130,30 +135,52 @@ public class SMCameraPresenter implements ISMCamera.Presenter,
         mIsAspectRationFull = !mIsAspectRationFull;
         mCameraPreview.setAspectRatio(mIsAspectRationFull ? 16 : 4, mIsAspectRationFull ? 9 : 3);
         mView.setFullAspectRatio(mIsAspectRationFull);
+        // stopCameraPreview();
+        // startCameraPreview();
+        if (mIsAspectRationFull) {
+            mCameraSettings.setAspectRatio((double) 16 / 9);
+        } else {
+            mCameraSettings.setAspectRatio((double) 4 / 3);
+        }
     }
 
     @Override
     public void onVideoCaptureFinished(File outputVideoFile) {
+        Log.d(Constants.LOG_TAG_DEBUG, "SMCameraPresenter.onVideoCaptureFinished(): outputVideoFile: " + outputVideoFile.getAbsolutePath());
         if (outputVideoFile == null || mView == null) return;
-        Toast.makeText(mView.getActivity(), outputVideoFile.getAbsolutePath(), Toast.LENGTH_SHORT).show();
+        mView.getActivity().runOnUiThread(() ->
+                Toast.makeText(mView.getActivity(), outputVideoFile.getAbsolutePath(), Toast.LENGTH_SHORT).show()
+        );
     }
 
     @Override
     public void onPhotoCaptureFinished(File outputPhotoFile) {
+        Log.d(Constants.LOG_TAG_DEBUG, "SMCameraPresenter.onPhotoCaptureFinished(): outputPhotoFile: " + outputPhotoFile.getAbsolutePath());
         if (outputPhotoFile == null || mView == null) return;
-        Toast.makeText(mView.getActivity(), outputPhotoFile.getAbsolutePath(), Toast.LENGTH_SHORT).show();
+        mView.getActivity().runOnUiThread(() ->
+                Toast.makeText(mView.getActivity(), outputPhotoFile.getAbsolutePath(), Toast.LENGTH_SHORT).show()
+        );
+
+    }
+
+    @Override
+    public void onCameraReady() {
+        if (mView == null) return;
+        mView.getActivity().runOnUiThread(() ->
+                mView.setIsCameraLoading(false)
+        );
     }
 
     private void startCameraPreview() {
         if (mView == null) return;
+        mView.setIsCameraLoading(true);
         if (mCameraHelper != null) {
             mCameraHelper.startCamera(
                     mView.getActivity(),
-                    true,
                     mCameraPreview,
                     mTextureWidth,
                     mTextureHeight,
-                    mView.getActivity().getWindow().getWindowManager().getDefaultDisplay().getRotation()
+                    mCameraSettings
             );
         }
     }
@@ -162,6 +189,20 @@ public class SMCameraPresenter implements ISMCamera.Presenter,
         if (mView == null) return;
         if (mCameraHelper != null)
             mCameraHelper.stopCamera(mView.getActivity());
+    }
+
+    private void restartCameraPreview() {
+        if (mView == null) return;
+        mView.setIsCameraLoading(true);
+        if (mCameraHelper != null) {
+            mCameraHelper.restartCamera(
+                    mView.getActivity(),
+                    mCameraPreview,
+                    mTextureWidth,
+                    mTextureHeight,
+                    mCameraSettings
+            );
+        }
     }
 
     private boolean checkRuntimePermissions() {

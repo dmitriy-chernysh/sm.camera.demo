@@ -1,6 +1,7 @@
 package com.mobiledevpro.smcamera;
 
 import android.content.Context;
+import android.support.annotation.NonNull;
 import android.view.TextureView;
 
 import java.io.File;
@@ -16,6 +17,9 @@ import java.io.File;
  */
 public interface ICameraHelper {
 
+    interface IOpenCameraCallbacks {
+        void onCameraReady();
+    }
     interface IVideoCaptureCallbacks {
         void onVideoCaptureFinished(File outputVideoFile);
     }
@@ -30,11 +34,10 @@ public interface ICameraHelper {
     boolean isThisSamsungDevice();
 
     void startCamera(Context context,
-                     boolean useBackCamera,
                      TextureView textureView,
                      int textureWidth,
                      int textureHeight,
-                     int rotation);
+                     @NonNull CameraSettings cameraSettings);
 
     void stopCamera(Context context);
 
@@ -47,4 +50,10 @@ public interface ICameraHelper {
      * Take photo picture
      */
     void takePicture();
+
+    void restartCamera(Context context,
+                       TextureView textureView,
+                       int textureWidth,
+                       int textureHeight,
+                       @NonNull CameraSettings cameraSettings);
 }
