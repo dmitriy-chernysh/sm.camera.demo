@@ -52,6 +52,9 @@ public class SMCameraFragment extends BaseFragment implements ISMCamera.View, Te
     @BindView(R.id.btn_aspect)
     ImageButton mBtnAspectRation;
 
+    @BindView(R.id.btn_flashlight)
+    ImageButton mBtnFlashlight;
+
     @BindView(R.id.tv_camera_loading)
     TextView mTvCameraLoading;
 
@@ -73,7 +76,6 @@ public class SMCameraFragment extends BaseFragment implements ISMCamera.View, Te
     @Override
     public void onCreate(@Nullable Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        setRetainInstance(false);
 
         Activity activity = getActivity();
         if (activity != null) {
@@ -99,10 +101,6 @@ public class SMCameraFragment extends BaseFragment implements ISMCamera.View, Te
         mPresenter = new SMCameraPresenter();
     }
 
-    @Override
-    public void onViewCreated(View view, @Nullable Bundle savedInstanceState) {
-        super.onViewCreated(view, savedInstanceState);
-    }
 
     @Override
     public void onStart() {
@@ -176,9 +174,20 @@ public class SMCameraFragment extends BaseFragment implements ISMCamera.View, Te
 
     @Override
     public void setIsCameraLoading(boolean isLoading) {
+        Log.d(Constants.LOG_TAG_DEBUG, "SMCameraFragment.setIsCameraLoading(): isLoading - " + isLoading);
         mTvCameraLoading.setVisibility(isLoading ? View.VISIBLE : View.GONE);
         mLayoutCaptureButtons.setVisibility(isLoading ? View.INVISIBLE : View.VISIBLE);
         //  mCameraPreview.setVisibility(isLoading ? View.INVISIBLE : View.VISIBLE);
+    }
+
+    @Override
+    public void setIsFlashlightAvailable(boolean isAvailable) {
+        mBtnFlashlight.setVisibility(isAvailable ? View.VISIBLE : View.INVISIBLE);
+    }
+
+    @Override
+    public void setFlashLightOn(boolean b) {
+        mBtnFlashlight.setActivated(b);
     }
 
     @OnClick(R.id.btn_record_start_stop)
@@ -194,5 +203,10 @@ public class SMCameraFragment extends BaseFragment implements ISMCamera.View, Te
     @OnClick(R.id.btn_aspect)
     void onChangeAspectRatio(ImageButton button) {
         mPresenter.onAspectRatioButtonClick();
+    }
+
+    @OnClick(R.id.btn_flashlight)
+    void onFlashlightClick(ImageButton button) {
+        mPresenter.onFlashlightClick();
     }
 }

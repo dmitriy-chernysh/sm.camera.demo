@@ -37,6 +37,7 @@ public class SMCameraPresenter implements ISMCamera.Presenter,
 
     private boolean mIsVideoRecording;
     private boolean mIsAspectRationFull;
+    private boolean mIsFlashlightOn;
     private CameraHelper mCameraHelper;
     private CameraSettings mCameraSettings;
 
@@ -45,10 +46,10 @@ public class SMCameraPresenter implements ISMCamera.Presenter,
                          @NonNull File videoFilesDir,
                          @NonNull File photoFilesDir,
                          @NonNull CameraSettings cameraSettings) {
+        Log.d(Constants.LOG_TAG_DEBUG, "SMCameraPresenter.bindView(): ");
         mView = view;
         mCameraSettings = cameraSettings;
         mCameraPreview = mView.getCameraPreview();
-        //ratio by default
 
         mView.setIsCameraLoading(true);
 
@@ -82,8 +83,9 @@ public class SMCameraPresenter implements ISMCamera.Presenter,
 
     @Override
     public void unbindView() {
-        mView = null;
+        Log.d(Constants.LOG_TAG_DEBUG, "SMCameraPresenter.unbindView(): ");
         stopCameraPreview();
+        mView = null;
     }
 
 
@@ -135,13 +137,19 @@ public class SMCameraPresenter implements ISMCamera.Presenter,
         mIsAspectRationFull = !mIsAspectRationFull;
         mCameraPreview.setAspectRatio(mIsAspectRationFull ? 16 : 4, mIsAspectRationFull ? 9 : 3);
         mView.setFullAspectRatio(mIsAspectRationFull);
-        // stopCameraPreview();
-        // startCameraPreview();
+
         if (mIsAspectRationFull) {
             mCameraSettings.setAspectRatio((double) 16 / 9);
         } else {
             mCameraSettings.setAspectRatio((double) 4 / 3);
         }
+    }
+
+    @Override
+    public void onFlashlightClick() {
+        mIsFlashlightOn = !mIsFlashlightOn;
+        mCameraHelper.setFlashlightOn(mIsFlashlightOn);
+        mView.setFlashLightOn(mIsFlashlightOn);
     }
 
     @Override
@@ -165,11 +173,18 @@ public class SMCameraPresenter implements ISMCamera.Presenter,
 
     @Override
     public void onCameraReady() {
+        Log.d(Constants.LOG_TAG_DEBUG, "SMCameraPresenter.onCameraReady(): Thread: " + Thread.currentThread().getName());
+        Log.d(Constants.LOG_TAG_DEBUG, "SMCameraPresenter.onCameraReady(): mView == null " + (mView == null));
         if (mView == null) return;
-        mView.getActivity().runOnUiThread(() ->
-                mView.setIsCameraLoading(false)
+        mView.getActivity().runOnUiThread(() -> {
+                    mView.setIsCameraLoading(false);
+                    mView.setIsFlashlightAvailable(
+                            mCameraHelper.isFlashlightSupported()
+                    );
+                }
         );
     }
+
 
     private void startCameraPreview() {
         if (mView == null) return;

@@ -33,6 +33,8 @@ public interface ICameraHelper {
      */
     boolean isThisSamsungDevice();
 
+    boolean isFlashlightSupported();
+
     void startCamera(Context context,
                      TextureView textureView,
                      int textureWidth,
@@ -56,4 +58,6 @@ public interface ICameraHelper {
                        int textureWidth,
                        int textureHeight,
                        @NonNull CameraSettings cameraSettings);
+
+    void setFlashlightOn(boolean isOn);
 }

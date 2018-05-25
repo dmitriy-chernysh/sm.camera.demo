@@ -30,6 +30,14 @@
             android:background="@drawable/background_button_aspect_selector"
             android:contentDescription="@null"/>
 
+        <ImageButton
+            android:id="@+id/btn_flashlight"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginLeft="32dp"
+            android:background="@drawable/background_button_flash_selector"
+            android:contentDescription="@null"/>
+
     </LinearLayout>
 
     <TextView
@@ -60,13 +68,13 @@
             android:contentDescription="@null"/>
 
         <ImageButton
-            android:layout_marginBottom="16dp"
             android:id="@+id/btn_take_picture"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:background="@drawable/background_button_take_photo"
+            android:layout_alignParentBottom="true"
             android:layout_centerHorizontal="true"
-            android:layout_alignParentBottom="true"/>
+            android:layout_marginBottom="16dp"
+            android:background="@drawable/background_button_take_photo"/>
 
     </RelativeLayout>
 

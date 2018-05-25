@@ -137,7 +137,6 @@ class CameraHelper implements ICameraHelper {
 
         Log.d(Constants.LOG_TAG_DEBUG, "CameraHelper.CameraHelper(): Video files dir: " + mVideoFilesDir);
         Log.d(Constants.LOG_TAG_DEBUG, "CameraHelper.CameraHelper(): Photo files dir: " + photoFilesDir);
-        initSCamera(context);
     }
 
     public static CameraHelper init(@NonNull Context context,
@@ -163,6 +162,11 @@ class CameraHelper implements ICameraHelper {
     }
 
     @Override
+    public boolean isFlashlightSupported() {
+        return mCharacteristics != null && mCharacteristics.get(SCameraCharacteristics.FLASH_INFO_AVAILABLE);
+    }
+
+    @Override
     public synchronized void startCamera(Context context,
                                          TextureView textureView,
                                          int textureWidth,
@@ -176,6 +180,8 @@ class CameraHelper implements ICameraHelper {
                 "Rotation: " + mCameraExternalSettings.getRotation() + "\n" +
                 "Aspect Ratio: " + String.valueOf(mCameraExternalSettings.getAspectRatio()) + "\n"
         );
+
+        if (!initSCamera(context)) return;
 
         startBackgroundThread(context);
         try {
@@ -246,10 +252,33 @@ class CameraHelper implements ICameraHelper {
                     throw new RuntimeException("Photo capture failed. Error: " + failure.toString());
                 }
             }, mBackgroundHandler);
-            //  setCameraState(CAMERA_STATE_TAKE_PICTURE);
+
         } catch (CameraAccessException e) {
             throw new RuntimeException("Photo capture failed. Error: " + e.getLocalizedMessage());
         }
+    }
+
+    @Override
+    public void setFlashlightOn(boolean isOn) {
+        mBackgroundHandler.post(() -> {
+            try {
+                if (mCharacteristics.get(SCameraCharacteristics.FLASH_INFO_AVAILABLE)) {
+                    mPreviewBuilder.set(SCaptureRequest.FLASH_MODE,
+                            isOn ? SCaptureRequest.FLASH_MODE_TORCH : SCaptureRequest.FLASH_MODE_OFF);
+                    mSCameraSession.setRepeatingRequest(mPreviewBuilder.build(),
+                            mSessionCaptureCallback,
+                            mBackgroundHandler);
+
+                    mPhotoCaptureBuilder.set(SCaptureRequest.FLASH_MODE, isOn
+                            ? SCaptureRequest.FLASH_MODE_SINGLE
+                            : SCaptureRequest.FLASH_MODE_OFF);
+                    mPhotoCaptureBuilder.set(SCaptureRequest.CONTROL_AE_MODE,
+                            isOn ? SCaptureRequest.CONTROL_AE_MODE_ON_ALWAYS_FLASH : SCaptureRequest.CONTROL_AE_MODE_ON);
+                }
+            } catch (CameraAccessException e) {
+                throw new RuntimeException("Failed to turn " + (isOn ? "on" : "off") + " the flashlight. Error: " + e.getLocalizedMessage());
+            }
+        });
     }
 
     /**
@@ -291,6 +320,7 @@ class CameraHelper implements ICameraHelper {
      * @return True - camera has been initialized
      */
     private boolean initSCamera(Context context) {
+        if (mSCamera != null) return true;
         mSCamera = new SCamera();
         String message;
         try {
@@ -390,7 +420,7 @@ class CameraHelper implements ICameraHelper {
                 }
 
                 public void onOpened(SCameraDevice cameraDevice) {
-                    Log.d(Constants.LOG_TAG_DEBUG, "CameraHelper.onCameraReady(): " + cameraDevice.toString());
+                    Log.d(Constants.LOG_TAG_DEBUG, "CameraHelper.onOpened(): " + cameraDevice.toString());
                     mCameraOpenCloseLock.release();
                     if (getCameraState() == CAMERA_STATE_CLOSING) return;
                     mSCameraDevice = cameraDevice;
@@ -494,7 +524,8 @@ class CameraHelper implements ICameraHelper {
             // Create a request for video recording.
             mPreviewBuilder = mSCameraDevice.createCaptureRequest(SCameraDevice.TEMPLATE_RECORD);
             mPreviewBuilder.set(SCaptureRequest.CONTROL_AE_TARGET_FPS_RANGE, mVideoParameter.getFpsRange());
-            mPreviewBuilder.set(SCaptureRequest.CONTROL_AF_MODE, SCaptureRequest.CONTROL_AF_MODE_CONTINUOUS_PICTURE);
+            mPreviewBuilder.set(SCaptureRequest.CONTROL_AE_MODE, SCaptureRequest.CONTROL_AE_MODE_ON);
+            mPreviewBuilder.set(SCaptureRequest.CONTROL_AF_MODE, SCaptureRequest.CONTROL_AF_MODE_CONTINUOUS_VIDEO);
             //setup video stabilization
             setVideoStabilization(mCameraExternalSettings != null && mCameraExternalSettings.isVideoStabilisationEnabled());
             mPreviewBuilder.addTarget(previewSurface);
@@ -503,6 +534,7 @@ class CameraHelper implements ICameraHelper {
             // Create a request for image capture
             mPhotoCaptureBuilder = mSCameraDevice.createCaptureRequest(SCameraDevice.TEMPLATE_STILL_CAPTURE);
             mPhotoCaptureBuilder.set(SCaptureRequest.CONTROL_AF_MODE, SCaptureRequest.CONTROL_AF_MODE_CONTINUOUS_PICTURE);
+            mPhotoCaptureBuilder.set(SCaptureRequest.CONTROL_AE_MODE, SCaptureRequest.CONTROL_AE_MODE_ON);
             mPhotoCaptureBuilder.addTarget(mImageReader.getSurface());
 
 

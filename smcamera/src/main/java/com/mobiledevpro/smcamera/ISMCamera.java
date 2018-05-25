@@ -27,7 +27,11 @@ public interface ISMCamera {
 
         void setFullAspectRatio(boolean b);
 
+        void setFlashLightOn(boolean b);
+
         void setIsCameraLoading(boolean isLoading);
+
+        void setIsFlashlightAvailable(boolean isAvailable);
     }
 
     interface Presenter {
@@ -50,5 +54,7 @@ public interface ISMCamera {
         void onPhotoCaptureButtonClick();
 
         void onAspectRatioButtonClick();
+
+        void onFlashlightClick();
     }
 }
