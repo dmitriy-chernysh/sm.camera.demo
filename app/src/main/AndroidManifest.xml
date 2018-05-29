@@ -20,7 +20,8 @@
             android:configChanges="keyboard|orientation|screenSize|screenLayout|keyboardHidden"
             android:theme="@style/AppTheme.FullScreen"
             android:screenOrientation="landscape"
-            android:windowSoftInputMode="adjustResize">
+            android:windowSoftInputMode="adjustResize"
+            android:hardwareAccelerated="true">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN"/>
                 <category android:name="android.intent.category.LAUNCHER"/>
@@ -31,6 +32,15 @@
             android:name="io.fabric.ApiKey"
             android:value="cb3c0c75f23a6557866a798b16e146ec6e58b7a1"/>
 
+        <provider
+            android:name="android.support.v4.content.FileProvider"
+            android:authorities="com.mobiledevpro.sm.camera.demo.provider"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/provider_paths"/>
+        </provider>
     </application>
 
 </manifest>

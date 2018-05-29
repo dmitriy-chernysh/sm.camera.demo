@@ -117,7 +117,7 @@ dependencies {
     annotationProcessor "com.jakewharton:butterknife-compiler:$butterKnifeVersion"
 
     //commons-ui
-    implementation 'com.github.mobile-dev-pro:commons-ui:1.0.6'
+    implementation "com.github.mobile-dev-pro:commons-ui:$rootProject.commonsUiVersion"
 
     implementation project(":smcamera")
 }

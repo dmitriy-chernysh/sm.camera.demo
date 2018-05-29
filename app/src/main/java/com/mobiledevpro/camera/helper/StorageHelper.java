@@ -1,7 +1,7 @@
 package com.mobiledevpro.camera.helper;
 
 import android.content.Context;
-import android.os.Environment;
+import android.support.v4.content.ContextCompat;
 
 import java.io.File;
 import java.text.SimpleDateFormat;
@@ -19,18 +19,16 @@ import java.util.Locale;
  */
 public class StorageHelper {
 
-    private static final String VIDEO_FOLDER_NAME = "SM Camera Demo";
-
     private File mAppFolder;
     private static StorageHelper sStorageHelper;
 
-    private StorageHelper() {
-        mAppFolder = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_MOVIES);
+    private StorageHelper(Context appContext) {
+        mAppFolder = ContextCompat.getExternalFilesDirs(appContext, null)[0];
     }
 
     public static StorageHelper get(Context appContext) {
         if (sStorageHelper == null) {
-            sStorageHelper = new StorageHelper();
+            sStorageHelper = new StorageHelper(appContext);
         }
         return sStorageHelper;
     }
@@ -42,7 +40,7 @@ public class StorageHelper {
      */
     public File createNewVideoFile() {
         String timeStamp = new SimpleDateFormat("yyyyMMdd_HHmmssSSS", Locale.getDefault()).format(new Date());
-        String fileName = mAppFolder + File.separator + VIDEO_FOLDER_NAME + File.separator + "temp_video_" + timeStamp + ".mp4";
+        String fileName = mAppFolder + File.separator + File.separator + "temp_video_" + timeStamp + ".mp4";
         File file = new File(fileName);
         if (!file.exists()) file.mkdirs();
         return file;
@@ -54,9 +52,8 @@ public class StorageHelper {
      * @return File path
      */
     public File getVideoFilesDir() {
-        File file = new File(mAppFolder + File.separator + VIDEO_FOLDER_NAME);
-        if (!file.exists()) file.mkdirs();
-        return file;
+        if (!mAppFolder.exists()) mAppFolder.mkdirs();
+        return mAppFolder;
     }
 
 
@@ -66,8 +63,7 @@ public class StorageHelper {
      * @return File path
      */
     public File getPhotoFilesDir() {
-        File file = new File(mAppFolder + File.separator + VIDEO_FOLDER_NAME);
-        if (!file.exists()) file.mkdirs();
-        return file;
+        if (!mAppFolder.exists()) mAppFolder.mkdirs();
+        return mAppFolder;
     }
 }

@@ -94,9 +94,6 @@ class CameraHelper implements ICameraHelper {
     private File mPhotoFilesDir;
 
     private CameraSettings mCameraExternalSettings;
-    private IVideoCaptureCallbacks mVideoCaptureCallbacks;
-    private IPhotoCaptureCallbacks mPhotoCaptureCallbacks;
-    private IOpenCameraCallbacks mOpenCameraCallbacks;
     private File mRecordedVideoFile;
 
     private SCameraCaptureSession.CaptureCallback mSessionCaptureCallback = new SCameraCaptureSession.CaptureCallback() {
@@ -125,15 +122,9 @@ class CameraHelper implements ICameraHelper {
 
     private CameraHelper(@NonNull Context context,
                          @NonNull File videoFilesDir,
-                         @NonNull File photoFilesDir,
-                         IVideoCaptureCallbacks videoCaptureCallbacks,
-                         IPhotoCaptureCallbacks photoCaptureCallbacks,
-                         IOpenCameraCallbacks openCameraCallbacks) {
+                         @NonNull File photoFilesDir) {
         mVideoFilesDir = videoFilesDir;
         mPhotoFilesDir = photoFilesDir;
-        mVideoCaptureCallbacks = videoCaptureCallbacks;
-        mPhotoCaptureCallbacks = photoCaptureCallbacks;
-        mOpenCameraCallbacks = openCameraCallbacks;
 
         Log.d(Constants.LOG_TAG_DEBUG, "CameraHelper.CameraHelper(): Video files dir: " + mVideoFilesDir);
         Log.d(Constants.LOG_TAG_DEBUG, "CameraHelper.CameraHelper(): Photo files dir: " + photoFilesDir);
@@ -141,17 +132,11 @@ class CameraHelper implements ICameraHelper {
 
     public static CameraHelper init(@NonNull Context context,
                                     @NonNull File videoFilesDir,
-                                    @NonNull File photoFilesDir,
-                                    IVideoCaptureCallbacks videoCaptureCallbacks,
-                                    IPhotoCaptureCallbacks photoCaptureCallbacks,
-                                    IOpenCameraCallbacks openCameraCallbacks) {
+                                    @NonNull File photoFilesDir) {
         if (sHelper == null)
             sHelper = new CameraHelper(context,
                     videoFilesDir,
-                    photoFilesDir,
-                    videoCaptureCallbacks,
-                    photoCaptureCallbacks,
-                    openCameraCallbacks);
+                    photoFilesDir);
         return sHelper;
     }
 
@@ -226,8 +211,11 @@ class CameraHelper implements ICameraHelper {
             //stop video recording
             mMediaRecorder.stop();
             mMediaRecorder.reset();
-            if (mVideoCaptureCallbacks != null)
-                mVideoCaptureCallbacks.onVideoCaptureFinished(mRecordedVideoFile);
+
+            RxEventBus.getInstance().setEvent(
+                    new RxEventOnVideoCaptureFinished(mRecordedVideoFile)
+            );
+
             Log.d(Constants.LOG_TAG_DEBUG, "CameraHelper.startStopVideoRecording(): STOP RECORD");
 
             mBackgroundHandler.post(() -> {
@@ -638,8 +626,7 @@ class CameraHelper implements ICameraHelper {
                     mSessionCaptureCallback,
                     mBackgroundHandler);
             setCameraState(CAMERA_STATE_PREVIEW);
-            if (mOpenCameraCallbacks != null)
-                mOpenCameraCallbacks.onCameraReady();
+            RxEventBus.getInstance().setEvent(new RxEventOnCameraReady());
         } catch (CameraAccessException e) {
             throw new RuntimeException("Fail to start preview. Error: " + e.getLocalizedMessage());
         }
@@ -844,8 +831,10 @@ class CameraHelper implements ICameraHelper {
                 try {
                     output = new FileOutputStream(imageFile);
                     output.write(bytes);
-                    if (mPhotoCaptureCallbacks != null)
-                        mPhotoCaptureCallbacks.onPhotoCaptureFinished(imageFile);
+
+                    RxEventBus.getInstance().setEvent(
+                            new RxEventOnPhotoCaptureFinished(imageFile)
+                    );
                 } catch (IOException e) {
                     throw new RuntimeException("Cannot save photo picture. Error: " + e.getLocalizedMessage());
                 } finally {
@@ -900,5 +889,38 @@ class CameraHelper implements ICameraHelper {
         }
     }
 
+    //RX Events
 
+    static class RxEventOnCameraReady {
+    }
+
+    static class RxEventOnVideoCaptureFinished {
+        private File outputVideoFile;
+
+        private RxEventOnVideoCaptureFinished() {
+        }
+
+        RxEventOnVideoCaptureFinished(File outputVideoFile) {
+            this.outputVideoFile = outputVideoFile;
+        }
+
+        public File getOutputVideoFile() {
+            return outputVideoFile;
+        }
+    }
+
+    static class RxEventOnPhotoCaptureFinished {
+        private File outputPhotoFile;
+
+        private RxEventOnPhotoCaptureFinished() {
+        }
+
+        private RxEventOnPhotoCaptureFinished(File outputPhotoFile) {
+            this.outputPhotoFile = outputPhotoFile;
+        }
+
+        public File getOutputPhotoFile() {
+            return outputPhotoFile;
+        }
+    }
 }

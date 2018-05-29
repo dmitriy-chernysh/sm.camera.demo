@@ -17,9 +17,6 @@ import java.io.File;
  */
 public interface ICameraHelper {
 
-    interface IOpenCameraCallbacks {
-        void onCameraReady();
-    }
     interface IVideoCaptureCallbacks {
         void onVideoCaptureFinished(File outputVideoFile);
     }

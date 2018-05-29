@@ -36,4 +36,7 @@ ext {
     supportLibraryVersion = '27.1.0'
     butterKnifeVersion = '8.8.1'
     crashlyticsVersion = '2.7.1'
+    commonsUiVersion = '1.0.6'
+    rxJavaVesrion = '2.1.9'
+    rxAndroidVersion = '2.0.2'
 }

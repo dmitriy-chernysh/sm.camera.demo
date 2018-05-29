@@ -114,6 +114,11 @@ public class SMCameraFragment extends BaseFragment implements ISMCamera.View, Te
                         .setAudioEnabled(true)
                         .setRotation(getActivity().getWindow().getWindowManager().getDefaultDisplay().getRotation())
         );
+        if (mCameraPreview.isAvailable()) {
+            onSurfaceTextureAvailable(mCameraPreview.getSurfaceTexture(),
+                    mCameraPreview.getWidth(),
+                    mCameraPreview.getHeight());
+        }
     }
 
     @Override
