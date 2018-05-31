@@ -1,6 +1,6 @@
 #! /bin/sh
 
-echo y | android update sdk --filter "build-tools-25.0.2,android-25,extra-android-m2repository" --no-ui -a # Grab the Android Support Repo which isn't included in the container
+echo y | android update sdk --filter "build-tools-26.0.2,android-26,extra-android-m2repository" --no-ui -a # Grab the Android Support Repo which isn't included in the container
 mkdir "${ANDROID_HOME}/licenses" || true
 echo "8933bad161af4178b1185d1a37fbf41ea5269c55" > "${ANDROID_HOME}/licenses/android-sdk-license"
 
@@ -12,4 +12,4 @@ git submodule update
 ./gradlew dependencies
 
 #build debug and release apk
-./gradlew assemble
+./gradlew assembleRelease

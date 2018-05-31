@@ -4,8 +4,6 @@ import android.content.Context;
 import android.support.annotation.NonNull;
 import android.view.TextureView;
 
-import java.io.File;
-
 /**
  * Interface for camera helper
  * <p>
@@ -16,14 +14,6 @@ import java.io.File;
  * #MobileDevPro
  */
 public interface ICameraHelper {
-
-    interface IVideoCaptureCallbacks {
-        void onVideoCaptureFinished(File outputVideoFile);
-    }
-
-    interface IPhotoCaptureCallbacks {
-        void onPhotoCaptureFinished(File outputPhotoFile);
-    }
 
     /**
      * Check if it's a Samsung device

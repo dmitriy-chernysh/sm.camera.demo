@@ -15,6 +15,8 @@ repositories {
     maven { url 'https://maven.fabric.io/public' }
 }
 
+ext.abiCodes = ['arm64-v8a': 2, armeabi: 3, 'armeabi-v7a': 4, mips: 5, mips64: 6, x86: 7, 'x86_64': 8]
+
 android {
     compileSdkVersion rootProject.compileSdkVersion
 
@@ -33,10 +35,10 @@ android {
     signingConfigs {
         //uses for CI
         config {
-            keyAlias 'here alias value'
-            keyPassword System.getenv("SOME_APP_KEYPWD")
-            storeFile file('here key file name')
-            storePassword System.getenv("SOME_APP_KSTOREPWD")
+            keyAlias 'key0'
+            keyPassword 'SmCamera18'
+            storeFile file('sm-camera-demo.jks')
+            storePassword 'SmCamera18'
         }
     }
 
@@ -51,7 +53,7 @@ android {
         }
         release {
             debuggable false
-            minifyEnabled true
+            minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
             signingConfig signingConfigs.config
         }
@@ -93,11 +95,13 @@ android {
     android.applicationVariants.all { variant ->
         variant.outputs.all { output ->
             def outputFile = output.outputFile
+            def abiVersionCode = project.ext.abiCodes.get(output.getFilter("ABI"))
             if (outputFile != null && outputFile.name.endsWith('.apk')) {
                 outputFileName = variant.productFlavors[0].applicationId + "-" +
                         "v" + variant.productFlavors[0].versionName + "_" +
                         "build" + variant.productFlavors[0].versionCode + "-" +
                         variant.buildType.name +
+                        (abiVersionCode != null ? abiVersionCode : "") +
                         ".apk"
             }
         }

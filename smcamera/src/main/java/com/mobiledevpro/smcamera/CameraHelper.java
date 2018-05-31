@@ -120,8 +120,7 @@ class CameraHelper implements ICameraHelper {
         mImageSaver.save(image, createNewPhotoFile());
     };
 
-    private CameraHelper(@NonNull Context context,
-                         @NonNull File videoFilesDir,
+    private CameraHelper(@NonNull File videoFilesDir,
                          @NonNull File photoFilesDir) {
         mVideoFilesDir = videoFilesDir;
         mPhotoFilesDir = photoFilesDir;
@@ -130,11 +129,10 @@ class CameraHelper implements ICameraHelper {
         Log.d(Constants.LOG_TAG_DEBUG, "CameraHelper.CameraHelper(): Photo files dir: " + photoFilesDir);
     }
 
-    public static CameraHelper init(@NonNull Context context,
-                                    @NonNull File videoFilesDir,
+    public static CameraHelper init(@NonNull File videoFilesDir,
                                     @NonNull File photoFilesDir) {
         if (sHelper == null)
-            sHelper = new CameraHelper(context,
+            sHelper = new CameraHelper(
                     videoFilesDir,
                     photoFilesDir);
         return sHelper;
@@ -514,6 +512,7 @@ class CameraHelper implements ICameraHelper {
             mPreviewBuilder.set(SCaptureRequest.CONTROL_AE_TARGET_FPS_RANGE, mVideoParameter.getFpsRange());
             mPreviewBuilder.set(SCaptureRequest.CONTROL_AE_MODE, SCaptureRequest.CONTROL_AE_MODE_ON);
             mPreviewBuilder.set(SCaptureRequest.CONTROL_AF_MODE, SCaptureRequest.CONTROL_AF_MODE_CONTINUOUS_VIDEO);
+            mPreviewBuilder.set(SCaptureRequest.CONTROL_AWB_MODE, SCaptureRequest.CONTROL_AWB_MODE_AUTO);
             //setup video stabilization
             setVideoStabilization(mCameraExternalSettings != null && mCameraExternalSettings.isVideoStabilisationEnabled());
             mPreviewBuilder.addTarget(previewSurface);
@@ -521,8 +520,9 @@ class CameraHelper implements ICameraHelper {
 
             // Create a request for image capture
             mPhotoCaptureBuilder = mSCameraDevice.createCaptureRequest(SCameraDevice.TEMPLATE_STILL_CAPTURE);
-            mPhotoCaptureBuilder.set(SCaptureRequest.CONTROL_AF_MODE, SCaptureRequest.CONTROL_AF_MODE_CONTINUOUS_PICTURE);
             mPhotoCaptureBuilder.set(SCaptureRequest.CONTROL_AE_MODE, SCaptureRequest.CONTROL_AE_MODE_ON);
+            mPhotoCaptureBuilder.set(SCaptureRequest.CONTROL_AF_MODE, SCaptureRequest.CONTROL_AF_MODE_CONTINUOUS_PICTURE);
+            mPreviewBuilder.set(SCaptureRequest.CONTROL_AWB_MODE, SCaptureRequest.CONTROL_AWB_MODE_AUTO);
             mPhotoCaptureBuilder.addTarget(mImageReader.getSurface());
 
 

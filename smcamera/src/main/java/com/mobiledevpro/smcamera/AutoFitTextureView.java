@@ -73,4 +73,8 @@ public class AutoFitTextureView extends TextureView {
         }
     }
 
+    @Override
+    public boolean performClick() {
+        return true;
+    }
 }
