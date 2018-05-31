@@ -61,6 +61,9 @@ public class SMCameraFragment extends BaseFragment implements ISMCamera.View, Te
     @BindView(R.id.layout_capture_buttons)
     View mLayoutCaptureButtons;
 
+    @BindView(R.id.metering_view)
+    View mMeteringView;
+
     private ISMCamera.Presenter mPresenter;
     private Unbinder mButterKnife;
 
@@ -112,6 +115,7 @@ public class SMCameraFragment extends BaseFragment implements ISMCamera.View, Te
                 new CameraSettings()
                         .setVideoStabilisationEnabled(true)
                         .setAudioEnabled(true)
+                        .setManualPhotoExposureEnabled(true)
                         .setRotation(getActivity().getWindow().getWindowManager().getDefaultDisplay().getRotation())
         );
         if (mCameraPreview.isAvailable()) {
@@ -165,6 +169,11 @@ public class SMCameraFragment extends BaseFragment implements ISMCamera.View, Te
     @Override
     public AutoFitTextureView getCameraPreview() {
         return mCameraPreview;
+    }
+
+    @Override
+    public View getMeteringView() {
+        return mMeteringView;
     }
 
     @Override

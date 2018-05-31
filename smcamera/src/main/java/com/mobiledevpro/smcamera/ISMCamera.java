@@ -23,6 +23,8 @@ public interface ISMCamera {
 
         AutoFitTextureView getCameraPreview();
 
+        android.view.View getMeteringView();
+
         void setRecordingState(boolean isRecording);
 
         void setFullAspectRatio(boolean b);

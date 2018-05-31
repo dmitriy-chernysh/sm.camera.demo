@@ -7,6 +7,8 @@ import android.support.annotation.NonNull;
 import android.support.v4.app.Fragment;
 import android.support.v4.content.FileProvider;
 import android.util.Log;
+import android.view.MotionEvent;
+import android.view.View;
 import android.view.Window;
 import android.view.WindowManager;
 import android.widget.Toast;
@@ -30,7 +32,7 @@ import io.reactivex.disposables.Disposable;
  * #MobileDevPro
  */
 
-public class SMCameraPresenter implements ISMCamera.Presenter {
+public class SMCameraPresenter implements ISMCamera.Presenter, View.OnTouchListener {
     private static final int CODE_REQUEST_PERMISSION_CAMERA = 10001;
 
     private ISMCamera.View mView;
@@ -57,6 +59,11 @@ public class SMCameraPresenter implements ISMCamera.Presenter {
         mCameraSettings = cameraSettings;
         mCameraPreview = mView.getCameraPreview();
 
+        //set touch listener to draw metering area
+        if (mCameraSettings.isManualPhotoExposureEnabled()) {
+            mView.getMeteringView().setOnTouchListener(this);
+        }
+
         mView.setIsCameraLoading(true);
 
         if (cameraSettings == null || cameraSettings.getAspectRatio() == (double) 16 / 9) {
@@ -69,7 +76,6 @@ public class SMCameraPresenter implements ISMCamera.Presenter {
         mView.setFullAspectRatio(mIsAspectRationFull);
 
         mCameraHelper = CameraHelper.init(
-                mView.getActivity(),
                 videoFilesDir,
                 photoFilesDir
         );
@@ -154,6 +160,19 @@ public class SMCameraPresenter implements ISMCamera.Presenter {
         mIsFlashlightOn = !mIsFlashlightOn;
         mCameraHelper.setFlashlightOn(mIsFlashlightOn);
         mView.setFlashLightOn(mIsFlashlightOn);
+    }
+
+    /**
+     * Touch listener for metering area on camera preview
+     */
+    @Override
+    public boolean onTouch(View view, MotionEvent motionEvent) {
+        if (motionEvent.getAction() == MotionEvent.ACTION_DOWN) {
+            drawMeteringRectangle((int) motionEvent.getRawX(), (int) motionEvent.getRawY());
+            return true;
+        }
+
+        return false;
     }
 
     private void onCameraReady() {
@@ -264,5 +283,10 @@ public class SMCameraPresenter implements ISMCamera.Presenter {
         if (mSubscriptions == null) return;
         mSubscriptions.dispose();
         mSubscriptions = null;
+    }
+
+    private void drawMeteringRectangle(int centerX, int centerY) {
+        if (mView == null) return;
+        ((MeteringAreaView) mView.getMeteringView()).setRectangle(centerX, centerY);
     }
 }
